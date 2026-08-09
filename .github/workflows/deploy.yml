@@ -65,9 +65,17 @@ jobs:
       # own temp clone, which doesn't inherit this repo's local git config.
       # (--user is also unusable here - gh-pages rejects "github-actions[bot]"
       # because square brackets aren't valid in an unquoted display name.)
+      # --repo carries the token because gh-pages clones the remote into its
+      # own temp directory, which doesn't inherit the credentials actions/
+      # checkout wrote into this repo's .git/config. Without it the push fails
+      # with "could not read Username for https://github.com".
+      # GITHUB_TOKEN is provided by Actions and masked in the logs.
       - name: Publish to the gh-pages branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           npx gh-pages --dist build --dotfiles \
+            --repo "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
             --message "Deploy ${GITHUB_SHA::7} [skip ci]"
