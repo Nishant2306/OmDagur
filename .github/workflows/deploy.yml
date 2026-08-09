@@ -1,0 +1,64 @@
+name: Deploy to GitHub Pages
+
+# Publishes the site every time main is updated. Also runnable by hand from
+# the Actions tab (Run workflow) if you ever need to re-deploy without a push.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Needed so the job can push the built site to the gh-pages branch.
+permissions:
+  contents: write
+
+# If you push twice quickly, don't let two deploys race each other —
+# cancel the older run and let the newest one win.
+concurrency:
+  group: deploy-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Without this, a missing or misnamed secret just produces a form that
+      # quietly falls back to mailto - which looks fine until someone tries to
+      # book. Surfaced as a build warning instead. Only the length is printed,
+      # never the value.
+      - name: Check the booking form key is present
+        env:
+          KEY: ${{ secrets.WEB3FORMS_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::warning title=Booking form not connected::The WEB3FORMS_KEY secret is empty or missing, so the form will open the visitor's mail app instead of emailing automatically. Add it under Settings > Secrets and variables > Actions."
+          else
+            echo "WEB3FORMS_KEY is set (${#KEY} characters)."
+          fi
+
+      - name: Build
+        env:
+          # Supplied by the repo secret (Settings > Secrets and variables >
+          # Actions > WEB3FORMS_KEY). If it's absent this is an empty string
+          # and the app falls back to the mailto flow rather than breaking.
+          REACT_APP_WEB3FORMS_KEY: ${{ secrets.WEB3FORMS_KEY }}
+        run: npm run build
+
+      - name: Publish to the gh-pages branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npx gh-pages --dist build --dotfiles \
+            --user "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>" \
+            --message "Deploy ${GITHUB_SHA::7} [skip ci]"
