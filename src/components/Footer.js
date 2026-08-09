@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { T, useTheme, CHANNELS } from "../theme";
 
 const NAME = "OM DAGUR";
@@ -25,6 +25,42 @@ export default function Footer() {
   const [hovered, setHovered] = useState(-1);
   const [tickles, setTickles] = useState(0);
   const idRef = useRef(0);
+
+  /* The giant name is sized in vw, so at some widths it rendered wider than the
+     footer and got cropped at both ends ("M DAGU"). Rather than guessing a font
+     size, measure the text and scale it down to fit.
+
+     The row is width:max-content so its offsetWidth is the true natural width —
+     as a normal-width flex container the letters simply overflowed it, and
+     scrollWidth ignored the overflow on the left, under-reporting the width. */
+  const nameWrapRef = useRef(null);
+  const nameRowRef = useRef(null);
+  const [fit, setFit] = useState(1);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const wrap = nameWrapRef.current, row = nameRowRef.current;
+      if (!wrap || !row) return;
+      const avail = wrap.clientWidth - 20;          // room for the stroke width
+      const natural = row.offsetWidth;              // layout metric: ignores transform
+      setFit(natural > 0 && natural > avail ? avail / natural : 1);
+    };
+    measure();
+    // ResizeObserver watches the box itself, so it also catches layout changes
+    // that never fire a window resize event (zoom, scrollbar appearing, etc).
+    let ro;
+    if (typeof ResizeObserver !== "undefined" && nameWrapRef.current) {
+      ro = new ResizeObserver(measure);
+      ro.observe(nameWrapRef.current);
+    }
+    window.addEventListener("resize", measure);
+    // Re-measure after the webfont swaps in — Syne is wider than the fallback.
+    if (document.fonts?.ready) document.fonts.ready.then(measure).catch(() => {});
+    return () => {
+      window.removeEventListener("resize", measure);
+      if (ro) ro.disconnect();
+    };
+  }, []);
 
   const burst = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -100,7 +136,7 @@ export default function Footer() {
             </span>
           </div>
           <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: t.textMuted, lineHeight: 1.75, maxWidth: 330, margin: 0 }}>
-            Stand-up comic turning desi struggles into punchlines. Got a stage, an office party or a fest? Let's talk.
+            I'm a stand-up comic turning desi struggles into punchlines. Got a stage, an office party or a fest? Let's talk.
           </p>
           <a href="#book" style={{
             display: "inline-flex", alignItems: "center", gap: 9, marginTop: 22,
@@ -145,17 +181,25 @@ export default function Footer() {
 
       {/* giant clickable name */}
       <div
+        ref={nameWrapRef}
         onClick={burst}
         title="go on, poke it"
-        style={{ position: "relative", cursor: "pointer", padding: "10px 16px 0", userSelect: "none" }}
+        style={{
+          position: "relative", cursor: "pointer", padding: "10px 10px 0",
+          userSelect: "none", overflow: "hidden",
+          display: "flex", justifyContent: "center",
+        }}
       >
         <div
+          ref={nameRowRef}
           onMouseLeave={() => setHovered(-1)}
           style={{
-            display: "flex", justifyContent: "center", alignItems: "flex-end",
+            display: "flex", alignItems: "flex-end",
+            width: "max-content",
             fontFamily: "'Syne', sans-serif", fontWeight: 800,
-            fontSize: "clamp(52px, 15.5vw, 230px)", lineHeight: .85,
-            letterSpacing: "-0.04em", whiteSpace: "nowrap",
+            fontSize: "clamp(44px, 13.5vw, 200px)", lineHeight: .9,
+            letterSpacing: "-0.03em", whiteSpace: "nowrap",
+            transform: `scale(${fit})`, transformOrigin: "50% 100%",
           }}
         >
           {NAME.split("").map((ch, i) => {

@@ -1,20 +1,25 @@
 import { useState, useEffect, useCallback } from "react";
 import { T, ThemeCtx, useTheme, MEDIA, CHANNELS, SOCIALS } from "./theme";
-import { Reveal, GlitchText } from "./shared";
+import { Reveal, GlitchText, useIsMobile } from "./shared";
 import InteractiveBackground from "./components/InteractiveBackground";
 import Loader from "./components/Loader";
 import Marquee from "./components/Marquee";
 import ScrollShowcase from "./components/ScrollShowcase";
-import Gallery from "./components/Gallery";
+import GalleryPage from "./components/GalleryPage";
 import BookShow from "./components/BookShow";
 import Footer from "./components/Footer";
 
+const GALLERY_HASH = "#/gallery";
+
 const NAV_ITEMS = [
   { label: "Watch", href: "#showcase" },
-  { label: "Gallery", href: "#gallery" },
+  { label: "Gallery", href: GALLERY_HASH, newTab: true },
   { label: "Channels", href: "#channels" },
   { label: "Book a Show", href: "#book" },
 ];
+
+const isGalleryRoute = () =>
+  typeof window !== "undefined" && window.location.hash.startsWith(GALLERY_HASH);
 
 function HamburgerMenu() {
   const { mode } = useTheme(); const t = T[mode];
@@ -28,9 +33,13 @@ function HamburgerMenu() {
       </button>
       <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 8, background: t.navBg, backdropFilter: "blur(24px) saturate(1.5)", border: `1px solid ${t.border}`, borderRadius: 16, padding: open ? "12px 8px" : "0 8px", minWidth: 190, overflow: "hidden", maxHeight: open ? 320 : 0, opacity: open ? 1 : 0, transition: "all 0.4s cubic-bezier(0.22, 1, 0.36, 1)", pointerEvents: open ? "auto" : "none", boxShadow: open ? `0 16px 48px ${t.shadowStrong}` : "none" }}>
         {NAV_ITEMS.map((item, i) => (
-          <a key={item.label} href={item.href} onClick={() => setOpen(false)} style={{ display: "block", padding: "12px 16px", borderRadius: 10, color: t.textMuted, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 500, transition: "all 0.2s ease", opacity: open ? 1 : 0, transform: open ? "translateX(0)" : "translateX(20px)", transitionDelay: `${i * 0.05}s` }}
+          <a key={item.label} href={item.href} onClick={() => setOpen(false)}
+            {...(item.newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+            style={{ display: "block", padding: "12px 16px", borderRadius: 10, color: t.textMuted, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 500, transition: "all 0.2s ease", opacity: open ? 1 : 0, transform: open ? "translateX(0)" : "translateX(20px)", transitionDelay: `${i * 0.05}s` }}
             onMouseEnter={(e) => { e.target.style.color = t.accent; e.target.style.background = t.surfaceHover; }}
-            onMouseLeave={(e) => { e.target.style.color = t.textMuted; e.target.style.background = "transparent"; }}>{item.label}</a>
+            onMouseLeave={(e) => { e.target.style.color = t.textMuted; e.target.style.background = "transparent"; }}>
+            {item.label}{item.newTab ? " ↗" : ""}
+          </a>
         ))}
       </div>
     </div>
@@ -63,88 +72,130 @@ function SubscribeBtn({ channel }) {
   );
 }
 
+/* Global styles + ambient layers, shared by the site and the gallery page. */
+function Chrome({ mode, children }) {
+  const t = T[mode];
+  return (
+    <div style={{ background: t.bg, minHeight: "100vh", position: "relative", overflowX: "clip", transition: "background 0.5s ease", color: t.text }}>
+      <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+      <style>{`
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        /* overflow-x: clip (not hidden) — "hidden" turns an ancestor into a
+           scroll container, which silently breaks position:sticky used by
+           the scroll showcase. "clip" crops overflow without that side effect. */
+        html { scroll-behavior: smooth; overflow-x: clip; scroll-padding-top: 88px; }
+        body { background: ${t.bg}; transition: background 0.5s ease; overflow-x: clip; }
+        ::selection { background: ${t.selection}; color: ${t.text}; }
+        html, body { scrollbar-width: thin; scrollbar-color: ${t.accent}50 transparent; }
+        html::-webkit-scrollbar, body::-webkit-scrollbar { width: 6px; }
+        html::-webkit-scrollbar-track, body::-webkit-scrollbar-track { background: transparent; }
+        html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb { background: ${t.accent}40; border-radius: 3px; }
+        div, section, iframe, canvas { scrollbar-width: none !important; }
+        div::-webkit-scrollbar, section::-webkit-scrollbar, iframe::-webkit-scrollbar, canvas::-webkit-scrollbar { display: none !important; width: 0 !important; }
+        textarea { scrollbar-width: thin !important; }
+
+        button, input, select, textarea { font-family: inherit; }
+        :focus-visible { outline: 2px solid ${t.accent}; outline-offset: 3px; border-radius: 4px; }
+
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-12px); } }
+        @keyframes gridShift { 0% { background-position: 0 0; } 100% { background-position: 60px 60px; } }
+        @keyframes starSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .section-label { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: ${t.accent}; opacity: 0.7; margin-bottom: 16px; }
+        .section-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(32px, 5vw, 56px); color: ${t.text}; line-height: 1.1; letter-spacing: -0.03em; }
+        .desktop-nav { display: flex; gap: 32px; align-items: center; }
+        .hamburger-wrap { display: none; position: relative; }
+
+        @media (max-width: 768px) {
+          .channels-grid { flex-direction: column !important; }
+          .socials-row { flex-direction: column !important; align-items: stretch !important; }
+          .desktop-nav { display: none !important; }
+          .hamburger-wrap { display: block !important; }
+          .hero-text-wrap { padding: 110px 20px 80px !important; align-items: center !important; text-align: center !important; max-width: 100% !important; margin: 0 auto !important; }
+          .hero-ctas { justify-content: center !important; }
+          .hero-socials { justify-content: center !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          html { scroll-behavior: auto; }
+          * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+        }
+      `}</style>
+
+      <InteractiveBackground />
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none", zIndex: 1, background: `repeating-linear-gradient(0deg, transparent, transparent 2px, ${t.scanline} 2px, ${t.scanline} 4px)` }} />
+      {mode === "dark" && (<>
+        <svg style={{ position: "fixed", width: 0, height: 0 }} aria-hidden="true"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" /><feColorMatrix type="saturate" values="0" /></filter></svg>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", opacity: 0.03, pointerEvents: "none", zIndex: 9999, filter: "url(#noise)" }} />
+      </>)}
+
+      {children}
+    </div>
+  );
+}
+
 /* ═══ MAIN APP ═══ */
 export default function OmDagurWebsite() {
   const [mode, setMode] = useState("dark");
   const [scrollY, setScrollY] = useState(0);
-  const [showLoader, setShowLoader] = useState(true);
-  const [loaded, setLoaded] = useState(false);
+  const [route, setRoute] = useState(() => (isGalleryRoute() ? "gallery" : "home"));
+  // The loader is for the front door only, not the gallery tab.
+  const [showLoader, setShowLoader] = useState(() => !isGalleryRoute());
+  const [loaded, setLoaded] = useState(() => isGalleryRoute());
   const [UnicornScene, setUnicornScene] = useState(null);
+  const isMob = useIsMobile();
   const toggle = useCallback(() => setMode((m) => (m === "dark" ? "light" : "dark")), []);
 
   useEffect(() => {
     const h = () => setScrollY(window.scrollY);
     window.addEventListener("scroll", h, { passive: true });
-    import("unicornstudio-react").then((mod) => setUnicornScene(() => mod.default)).catch(() => console.warn("UnicornStudio not available"));
-    return () => window.removeEventListener("scroll", h);
+    const onHash = () => setRoute(isGalleryRoute() ? "gallery" : "home");
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      window.removeEventListener("scroll", h);
+      window.removeEventListener("hashchange", onHash);
+    };
   }, []);
 
+  /* The WebGL hero scene is heavy — desktop only. */
+  useEffect(() => {
+    if (isMob || route !== "home" || UnicornScene) return;
+    let cancelled = false;
+    import("unicornstudio-react")
+      .then((m) => { if (!cancelled) setUnicornScene(() => m.default); })
+      .catch(() => console.warn("UnicornStudio not available"));
+    return () => { cancelled = true; };
+  }, [isMob, route, UnicornScene]);
+
   const t = T[mode];
+  const showUnicorn = !isMob && UnicornScene;
+
+  if (route === "gallery") {
+    return (
+      <ThemeCtx.Provider value={{ mode, toggle }}>
+        <Chrome mode={mode}>
+          <GalleryPage items={MEDIA} homeHref="#top" />
+        </Chrome>
+      </ThemeCtx.Provider>
+    );
+  }
 
   return (
     <ThemeCtx.Provider value={{ mode, toggle }}>
       {showLoader && <Loader onDone={() => { setShowLoader(false); setLoaded(true); }} />}
 
-      <div style={{ background: t.bg, minHeight: "100vh", position: "relative", overflowX: "clip", transition: "background 0.5s ease", color: t.text }}>
-        <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-        <style>{`
-          *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-          /* overflow-x: clip (not hidden) — "hidden" turns an ancestor into a
-             scroll container, which silently breaks position:sticky used by
-             the scroll showcase. "clip" crops overflow without that side effect. */
-          html { scroll-behavior: smooth; overflow-x: clip; scroll-padding-top: 88px; }
-          body { background: ${t.bg}; transition: background 0.5s ease; overflow-x: clip; }
-          ::selection { background: ${t.selection}; color: ${t.text}; }
-          html, body { scrollbar-width: thin; scrollbar-color: ${t.accent}50 transparent; }
-          html::-webkit-scrollbar, body::-webkit-scrollbar { width: 6px; }
-          html::-webkit-scrollbar-track, body::-webkit-scrollbar-track { background: transparent; }
-          html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb { background: ${t.accent}40; border-radius: 3px; }
-          div, section, iframe, canvas { scrollbar-width: none !important; }
-          div::-webkit-scrollbar, section::-webkit-scrollbar, iframe::-webkit-scrollbar, canvas::-webkit-scrollbar { display: none !important; width: 0 !important; }
-          textarea { scrollbar-width: thin !important; }
-
-          button, input, select, textarea { font-family: inherit; }
-          :focus-visible { outline: 2px solid ${t.accent}; outline-offset: 3px; border-radius: 4px; }
-
-          @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-12px); } }
-          @keyframes gridShift { 0% { background-position: 0 0; } 100% { background-position: 60px 60px; } }
-          @keyframes starSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-          .section-label { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: ${t.accent}; opacity: 0.7; margin-bottom: 16px; }
-          .section-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(32px, 5vw, 56px); color: ${t.text}; line-height: 1.1; letter-spacing: -0.03em; }
-          .desktop-nav { display: flex; gap: 32px; align-items: center; }
-          .hamburger-wrap { display: none; position: relative; }
-
-          @media (max-width: 768px) {
-            .channels-grid { flex-direction: column !important; }
-            .socials-row { flex-direction: column !important; align-items: stretch !important; }
-            .desktop-nav { display: none !important; }
-            .hamburger-wrap { display: block !important; }
-            .hero-text-wrap { padding: 0 20px !important; align-items: center !important; text-align: center !important; max-width: 100% !important; margin: 0 auto !important; }
-            .hero-ctas { justify-content: center !important; }
-            .hero-socials { justify-content: center !important; }
-          }
-          @media (prefers-reduced-motion: reduce) {
-            html { scroll-behavior: auto; }
-            * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
-          }
-        `}</style>
-
-        <InteractiveBackground />
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none", zIndex: 1, background: `repeating-linear-gradient(0deg, transparent, transparent 2px, ${t.scanline} 2px, ${t.scanline} 4px)` }} />
-        {mode === "dark" && (<>
-          <svg style={{ position: "fixed", width: 0, height: 0 }} aria-hidden="true"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" /><feColorMatrix type="saturate" values="0" /></filter></svg>
-          <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", opacity: 0.03, pointerEvents: "none", zIndex: 9999, filter: "url(#noise)" }} />
-        </>)}
-
+      <Chrome mode={mode}>
         {/* NAV */}
         <nav style={{ position: "fixed", top: 0, left: 0, right: 0, padding: "20px 40px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 100, background: scrollY > 50 ? t.navBg : t.bg, backdropFilter: scrollY > 50 ? "blur(20px)" : "none", borderBottom: `1px solid ${t.border}`, transition: "all 0.5s ease" }}>
           <a href="#top" style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: t.accent, letterSpacing: "-0.5px", textDecoration: "none" }}>OM.</a>
           <div className="desktop-nav">
             {NAV_ITEMS.map((item) => (
-              <a key={item.label} href={item.href} style={{ color: item.href === "#book" ? t.accent : t.textMuted, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: item.href === "#book" ? 700 : 500, transition: "color 0.3s" }}
+              <a key={item.label} href={item.href}
+                {...(item.newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                style={{ color: item.href === "#book" ? t.accent : t.textMuted, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: item.href === "#book" ? 700 : 500, transition: "color 0.3s" }}
                 onMouseEnter={(e) => { e.target.style.color = t.accent; }}
-                onMouseLeave={(e) => { e.target.style.color = item.href === "#book" ? t.accent : t.textMuted; }}>{item.label}</a>
+                onMouseLeave={(e) => { e.target.style.color = item.href === "#book" ? t.accent : t.textMuted; }}>
+                {item.label}{item.newTab ? " ↗" : ""}
+              </a>
             ))}
           </div>
           <HamburgerMenu />
@@ -153,7 +204,7 @@ export default function OmDagurWebsite() {
         {/* ═══ HERO ═══ */}
         <section id="top" style={{ minHeight: "100vh", position: "relative", zIndex: 2, overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 60, left: "-20%", right: 0, bottom: -60, zIndex: 0, height: "110%", width: "110%", overflow: "hidden" }}>
-            {UnicornScene ? (
+            {showUnicorn ? (
               <div style={{ width: "100%", height: "110%", overflow: "hidden" }}>
                 <UnicornScene
                   projectId="ePWprKIOebQvMTdIGUrx"
@@ -165,13 +216,13 @@ export default function OmDagurWebsite() {
                 />
               </div>
             ) : (
-              <div style={{ width: "100%", height: "100%", background: `radial-gradient(ellipse at 30% 50%, rgba(${t.accentRgb},0.06) 0%, transparent 60%)` }} />
+              <div style={{ width: "100%", height: "100%", background: `radial-gradient(ellipse at 30% 50%, rgba(${t.accentRgb},0.10) 0%, transparent 60%)` }} />
             )}
           </div>
 
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 180, background: `linear-gradient(to top, ${t.bg} 0%, ${t.bg} 30%, ${t.bg}f5 50%, ${t.bg}aa 70%, transparent 100%)`, zIndex: 3, pointerEvents: "none" }} />
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 100, background: `linear-gradient(to bottom, ${t.bg}cc, transparent)`, zIndex: 3, pointerEvents: "none" }} />
-          <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "55%", background: `linear-gradient(to left, ${t.bg}ee, ${t.bg}cc 30%, transparent 80%)`, zIndex: 2, pointerEvents: "none" }} />
+          {!isMob && <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "55%", background: `linear-gradient(to left, ${t.bg}ee, ${t.bg}cc 30%, transparent 80%)`, zIndex: 2, pointerEvents: "none" }} />}
           <div style={{ position: "absolute", inset: 0, zIndex: 1, backgroundImage: `linear-gradient(rgba(${t.accentRgb},0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(${t.accentRgb},0.04) 1px, transparent 1px)`, backgroundSize: "60px 60px", animation: "gridShift 20s linear infinite", maskImage: "radial-gradient(ellipse at center, black 30%, transparent 70%)", WebkitMaskImage: "radial-gradient(ellipse at center, black 30%, transparent 70%)", pointerEvents: "none" }} />
 
           <div className="hero-text-wrap" style={{ position: "relative", zIndex: 5, minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "flex-start", padding: "120px 120px 80px", marginLeft: "auto", maxWidth: "55%" }}>
@@ -186,7 +237,7 @@ export default function OmDagurWebsite() {
                 </h1>
               </div>
               <div style={{ opacity: loaded ? 1 : 0, transform: loaded ? "translateY(0)" : "translateY(30px)", transition: "all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.45s" }}>
-                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, color: t.textMuted, maxWidth: 400, margin: "28px 0 0", lineHeight: 1.7, fontStyle: "italic" }}>A stand-up comic turning desi struggles into comedy</p>
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 18, color: t.textMuted, maxWidth: 400, margin: "28px 0 0", lineHeight: 1.7, fontStyle: "italic" }}>I turn desi struggles into stand-up comedy.</p>
               </div>
               <div className="hero-ctas" style={{ opacity: loaded ? 1 : 0, transform: loaded ? "translateY(0)" : "translateY(30px)", transition: "all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s", display: "flex", gap: 14, marginTop: 36, flexWrap: "wrap" }}>
                 <a href="#showcase" style={{ padding: "14px 32px", borderRadius: 50, background: t.accent, color: t.onAccent, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, transition: "all 0.3s", boxShadow: `0 4px 20px rgba(${t.accentRgb},0.3)`, display: "inline-flex", alignItems: "center", gap: 8 }}
@@ -222,15 +273,12 @@ export default function OmDagurWebsite() {
         {/* ═══ RIBBON ═══ */}
         <Marquee />
 
-        {/* ═══ SCROLL SHOWCASE (replaces the old Videos + Shorts sections) ═══ */}
-        <ScrollShowcase items={MEDIA} galleryHref="#gallery" />
-
-        {/* ═══ GALLERY ═══ */}
-        <Gallery items={MEDIA} />
+        {/* ═══ SCROLL SHOWCASE ═══ */}
+        <ScrollShowcase items={MEDIA} galleryHref={GALLERY_HASH} />
 
         {/* ═══ CHANNELS ═══ */}
         <section id="channels" style={{ padding: "100px 24px", maxWidth: 1000, margin: "0 auto", position: "relative", zIndex: 2 }}>
-          <Reveal><div className="section-label">YouTube Channels</div><h2 className="section-title" style={{ marginBottom: 48 }}>The <span style={{ color: t.accent }}>hub</span></h2></Reveal>
+          <Reveal><div className="section-label">YouTube Channels</div><h2 className="section-title" style={{ marginBottom: 48 }}>My <span style={{ color: t.accent }}>hub</span></h2></Reveal>
           <div className="channels-grid" style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>{CHANNELS.map((ch, i) => <ChannelCard key={ch.id} channel={ch} index={i} />)}</div>
           <Reveal delay={0.4}><div style={{ display: "flex", gap: 20, justifyContent: "center", marginTop: 48, flexWrap: "wrap" }}>{CHANNELS.map((ch) => <SubscribeBtn key={ch.id} channel={ch} />)}</div></Reveal>
         </section>
@@ -260,7 +308,7 @@ export default function OmDagurWebsite() {
 
         {/* ═══ FOOTER ═══ */}
         <Footer />
-      </div>
+      </Chrome>
     </ThemeCtx.Provider>
   );
 }

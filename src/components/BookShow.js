@@ -32,7 +32,14 @@ const EVENT_TYPES = [
   "Something else",
 ];
 const AUDIENCE = ["Under 50", "50 – 150", "150 – 500", "500 – 1500", "1500+", "Not sure yet"];
-const BUDGET = ["Still figuring it out", "Under ₹25,000", "₹25,000 – ₹50,000", "₹50,000 – ₹1,00,000", "₹1,00,000+"];
+const BUDGET = [
+  "Still figuring it out",
+  "₹10,000 – ₹25,000",
+  "₹25,000 – ₹50,000",
+  "₹50,000 – ₹1,00,000",
+  "₹1,00,000 – ₹2,50,000",
+  "₹2,50,000+",
+];
 
 const EMPTY = {
   name: "", email: "", phone: "", eventType: "", eventDate: "",
@@ -181,7 +188,7 @@ export default function BookShow() {
           </h2>
           <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, color: t.textMuted, marginTop: 14, lineHeight: 1.7 }}>
             {status === "success"
-              ? <>Your enquiry just landed in Om's inbox. Expect a reply within a couple of days — check your spam folder too, just in case.</>
+              ? <>Your enquiry just landed in my inbox. I'll get back to you within a couple of days — check your spam folder too, just in case.</>
               : <>Your mail app should have opened with everything filled in. Just hit send — or write to <a href={`mailto:${TO_EMAIL}`} style={{ color: t.accent }}>{TO_EMAIL}</a> directly.</>}
           </p>
           <button
@@ -213,10 +220,10 @@ export default function BookShow() {
         <div style={{ textAlign: "center", marginBottom: 44 }}>
           <div className="section-label">Book a Show</div>
           <h2 className="section-title" style={{ marginBottom: 14 }}>
-            Get Om on your <span style={{ color: t.accent }}>stage</span>
+            Get me on your <span style={{ color: t.accent }}>stage</span>
           </h2>
           <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, color: t.textMuted, maxWidth: 520, margin: "0 auto", lineHeight: 1.7 }}>
-            Office party, college fest, wedding, brand collab — if there's a crowd and a mic, he's interested. Fill this in and it goes straight to his inbox.
+            Office party, college fest, wedding, brand collab — if there's a crowd and a mic, I'm interested. Fill this in and it lands straight in my inbox.
           </p>
         </div>
       </Reveal>
@@ -313,7 +320,7 @@ export default function BookShow() {
             </div>
 
             <div className="bk-full" {...wrap("message")}>
-              <Label htmlFor="bk-msg" required>Tell him about it</Label>
+              <Label htmlFor="bk-msg" required>Tell me about it</Label>
               <textarea id="bk-msg" rows={5} value={f.message} onChange={set("message")}
                 onFocus={() => setFocused("message")} onBlur={() => setFocused("")}
                 placeholder="The occasion, the crowd, how long a set you're after, anything else worth knowing…"

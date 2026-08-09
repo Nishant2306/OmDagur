@@ -34,6 +34,8 @@ export default function InteractiveBackground() {
     const isMob = window.innerWidth < 768;
     const COUNT = isMob ? 34 : 90;
     const MAX_TRAIL = 34;
+    const MAX_ATTRACTED = 3;   // how many particles may follow the pointer
+    const CURSOR_RADIUS = 260; // how close they must be to get caught
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -132,8 +134,23 @@ export default function InteractiveBackground() {
       });
       meteors = meteors.filter((m) => m.life > 0 && m.x > -200 && m.x < W + 200);
 
+      /* Only the few closest particles react to the pointer. Letting every
+         particle inside the radius get pulled produced a distracting swarm. */
+      const nearSet = new Set();
+      if (pointerLive) {
+        const cand = [];
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          const d = Math.sqrt((mx - p.x) ** 2 + (my - p.y) ** 2);
+          if (d < CURSOR_RADIUS) cand.push([d, i]);
+        }
+        cand.sort((a, b) => a[0] - b[0]);
+        for (let k = 0; k < Math.min(MAX_ATTRACTED, cand.length); k++) nearSet.add(cand[k][1]);
+      }
+
       particles.forEach((p, i) => {
         p.r = Math.max(0.1, p.baseR + Math.sin(frame * p.freq + p.phase) * 1);
+        const attracted = nearSet.has(i);
         attractors.forEach((a) => {
           a.phase += 0.001;
           const ax = a.x + Math.sin(a.phase) * 100, ay = a.y + Math.cos(a.phase * 0.7) * 100;
@@ -141,13 +158,13 @@ export default function InteractiveBackground() {
           if (dist < a.radius && dist > 10) { const f = a.strength * (1 - dist / a.radius); p.vx += (dx / dist) * f; p.vy += (dy / dist) * f; }
         });
         const dx = mx - p.x, dy = my - p.y, dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 300 && dist > 5) {
-          const f = 0.15 * (1 - dist / 300);
+        if (attracted && dist > 5) {
+          const f = 0.15 * (1 - dist / CURSOR_RADIUS);
           p.vx += (dx / dist) * f; p.vy += (dy / dist) * f;
           p.vx += (-dy / dist) * f * 0.5; p.vy += (dx / dist) * f * 0.5;
           if (dist < 80) { p.orbitAngle += 0.03; p.vx += (mx + Math.cos(p.orbitAngle) * dist - p.x) * 0.02; p.vy += (my + Math.sin(p.orbitAngle) * dist - p.y) * 0.02; }
         }
-        if (dist < 100 && mSpeed > 8 && Math.random() < 0.02) addRipple(p.x, p.y, 80);
+        if (attracted && dist < 100 && mSpeed > 8 && Math.random() < 0.02) addRipple(p.x, p.y, 80);
         p.vx *= 0.985; p.vy *= 0.985;
         const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
         if (speed > 3) { p.vx = (p.vx / speed) * 3; p.vy = (p.vy / speed) * 3; }
@@ -156,7 +173,9 @@ export default function InteractiveBackground() {
         if (p.y < -50) p.y = H + 50; if (p.y > H + 50) p.y = -50;
         p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > 8) p.trail.shift();
 
-        const glow = dist < 250 ? 1 - dist / 250 : 0;
+        // Highlight only the attracted few, so the pointer has a small
+        // entourage rather than a cloud.
+        const glow = attracted ? 1 - dist / CURSOR_RADIUS : 0;
         const bAlpha = 0.2 + Math.sin(frame * p.freq + p.phase) * 0.1;
         const cs = p.color === 1 ? t.particle1 : t.particle2;
         if (p.trail.length > 1 && speed > 0.5) {

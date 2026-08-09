@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { T, useTheme, embedUrl, watchUrl } from "../theme";
-import { Thumb, PlayGlyph, usePrefersReducedMotion } from "../shared";
+import { Thumb, PlayGlyph, usePrefersReducedMotion, useIsMobile } from "../shared";
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -18,19 +18,17 @@ function PhoneShell({ t, active, children }) {
     <div style={{
       position: "relative",
       aspectRatio: "9 / 16",
-      height: "min(60vh, 580px)",
+      height: "min(72vh, 660px)",
       borderRadius: 44,
       background: t.deviceShell,
       border: `2px solid ${active ? `rgba(${t.accentRgb},0.55)` : t.deviceEdge}`,
       padding: 9,
       transition: "border-color .5s ease, box-shadow .5s ease",
       boxShadow: active
-        ? `0 0 90px rgba(${t.accentRgb},0.28), 0 40px 90px ${t.shadowStrong}, inset 0 0 0 1px rgba(255,255,255,.05)`
+        ? `0 0 90px rgba(${t.accentRgb},0.28), 0 40px 90px ${t.shadowStrong}`
         : `0 20px 50px ${t.shadow}`,
     }}>
-      {/* notch */}
-      <div style={{ position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)", width: 92, height: 24, borderRadius: 14, background: t.deviceShell, zIndex: 4 }} />
-      {/* side buttons */}
+      <div style={{ position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)", width: 92, height: 24, borderRadius: 14, background: t.deviceShell, zIndex: 4, pointerEvents: "none" }} />
       <div style={{ position: "absolute", left: -3, top: "22%", width: 3, height: 34, borderRadius: 2, background: t.deviceEdge }} />
       <div style={{ position: "absolute", left: -3, top: "32%", width: 3, height: 54, borderRadius: 2, background: t.deviceEdge }} />
       <div style={{ position: "absolute", right: -3, top: "26%", width: 3, height: 62, borderRadius: 2, background: t.deviceEdge }} />
@@ -43,7 +41,8 @@ function PhoneShell({ t, active, children }) {
 
 function LaptopShell({ t, active, children }) {
   return (
-    <div style={{ width: "min(84vw, 880px, 88vh)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+    // width is capped by viewport height too, so the lid never overflows the stage
+    <div style={{ width: "min(88vw, 1200px, 124vh)", display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div style={{
         position: "relative", width: "100%", aspectRatio: "16 / 10",
         borderRadius: "16px 16px 5px 5px",
@@ -60,7 +59,6 @@ function LaptopShell({ t, active, children }) {
           {children}
         </div>
       </div>
-      {/* hinge + deck */}
       <div style={{
         width: "112%", height: 15,
         background: `linear-gradient(180deg, ${t.deviceShell}, ${t.deviceBase})`,
@@ -77,42 +75,40 @@ function LaptopShell({ t, active, children }) {
 
 /* ── One item on the stage ───────────────────────────────── */
 
-function Stagepiece({ item, offset, isPlaying, soundOn, onPlayRef, t, mode, isMob }) {
+function Stagepiece({ item, offset, isPlaying, soundOn, onPlayRef, t, mode }) {
   const a = Math.abs(offset);
-  const visible = a < 1.9;
+  // Nothing beyond the immediate neighbours needs to exist.
+  if (a > 1.25) return null;
 
-  const scale = a <= 1 ? 1 - a * 0.4 : Math.max(0.35, 0.6 - (a - 1) * 0.18);
-  const spread = isMob ? 78 : 62;
-  const x = offset * spread;
-  const rotY = clamp(-offset * 20, -34, 34);
-  const opacity = a <= 1 ? 1 - a * 0.6 : Math.max(0, 0.4 - (a - 1) * 0.55);
-  const blur = Math.min(5, Math.max(0, (a - 0.25) * 4));
+  /* Vertical travel: the outgoing item rises and shrinks away, the incoming
+     one climbs from below and grows into place. */
+  const y = offset * 74;                       // vh
+  const scale = Math.max(0.42, 1 - a * 0.44);
+  const opacity = clamp(1 - a * 1.05, 0, 1);
+  const active = a < 0.35;
 
   const Shell = item.kind === "short" ? PhoneShell : LaptopShell;
 
   return (
     <div
-      aria-hidden={!visible}
       style={{
         position: "absolute", top: "50%", left: "50%",
-        transform: `translate(-50%, -50%) translateX(${x}vw) scale(${scale}) rotateY(${rotY}deg)`,
-        opacity, filter: blur > 0.15 ? `blur(${blur}px)` : "none",
+        transform: `translate(-50%, -50%) translateY(${y}vh) scale(${scale})`,
+        opacity,
         zIndex: 60 - Math.round(a * 10),
-        transition: "filter .25s linear",
         willChange: "transform, opacity",
-        visibility: visible ? "visible" : "hidden",
-        pointerEvents: a < 0.4 ? "auto" : "none",
+        pointerEvents: active ? "auto" : "none",
       }}
     >
-      <Shell t={t} active={a < 0.4}>
+      <Shell t={t} active={active}>
         {isPlaying ? (
           <iframe
-            ref={(el) => onPlayRef(el)}
+            ref={onPlayRef}
             title={item.title}
             src={embedUrl(item, { autoplay: true, mute: !soundOn })}
             onLoad={(e) => { if (soundOn) post(e.currentTarget, "unMute"); }}
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
-            allow="autoplay; encrypted-media; picture-in-picture"
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
             allowFullScreen
           />
         ) : (
@@ -137,10 +133,11 @@ function Stagepiece({ item, offset, isPlaying, soundOn, onPlayRef, t, mode, isMo
 
 /* ── The showcase ────────────────────────────────────────── */
 
-export default function ScrollShowcase({ items, galleryHref = "#gallery" }) {
+export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
   const { mode } = useTheme();
   const t = T[mode];
   const reduced = usePrefersReducedMotion();
+  const isMob = useIsMobile();
   const sectionRef = useRef(null);
   const frameRefs = useRef({});
   const settleTimer = useRef(null);
@@ -148,18 +145,10 @@ export default function ScrollShowcase({ items, galleryHref = "#gallery" }) {
   const [raw, setRaw] = useState(0);
   const [playing, setPlaying] = useState(-1);
   const [soundOn, setSoundOn] = useState(false);
-  const [isMob, setIsMob] = useState(false);
 
   const N = items.length;
   const active = Math.round(raw);
   const progress = N > 1 ? raw / (N - 1) : 1;
-
-  useEffect(() => {
-    const check = () => setIsMob(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
 
   useEffect(() => {
     let ticking = false;
@@ -174,9 +163,6 @@ export default function ScrollShowcase({ items, galleryHref = "#gallery" }) {
       setRaw(p * (N - 1));
     };
     const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(measure); } };
-    // Background tabs suspend rAF, so a queued frame can be left in flight.
-    // Re-measure directly when the tab comes back rather than waiting for
-    // the next scroll event.
     const onVisible = () => { if (!document.hidden) { ticking = false; measure(); } };
     measure();
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -189,14 +175,16 @@ export default function ScrollShowcase({ items, galleryHref = "#gallery" }) {
     };
   }, [N]);
 
-  /* Only mount an iframe once the carousel has settled on an item,
-     otherwise a fast scroll would mount and tear down five embeds. */
+  /* Only mount an iframe once the stack has settled on an item, so a fast
+     scroll doesn't spin up five embeds. */
   useEffect(() => {
     if (reduced) return;
     clearTimeout(settleTimer.current);
     const el = sectionRef.current;
-    const onScreen = el && el.getBoundingClientRect().top < window.innerHeight * 0.5 && el.getBoundingClientRect().bottom > window.innerHeight * 0.5;
-    if (!onScreen) { setPlaying(-1); return; }
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const mid = window.innerHeight * 0.5;
+    if (!(r.top < mid && r.bottom > mid)) { setPlaying(-1); return; }
     settleTimer.current = setTimeout(() => setPlaying(active), 260);
     return () => clearTimeout(settleTimer.current);
   }, [active, raw, reduced]);
@@ -218,39 +206,47 @@ export default function ScrollShowcase({ items, galleryHref = "#gallery" }) {
   };
 
   const current = items[clamp(active, 0, N - 1)];
-  const endish = progress > 0.82;
+  const endish = progress > 0.84;
+
+  const pill = {
+    display: "inline-flex", alignItems: "center", gap: 7,
+    padding: "7px 14px", borderRadius: 40, cursor: "pointer",
+    fontFamily: "'Space Mono', monospace", fontSize: 10,
+    letterSpacing: ".14em", textTransform: "uppercase",
+    transition: "all .3s ease", textDecoration: "none",
+    pointerEvents: "auto",
+  };
 
   return (
-    <section
-      id="showcase"
-      ref={sectionRef}
-      style={{ position: "relative", zIndex: 2, height: `${N * 100}vh` }}
-    >
+    <section id="showcase" ref={sectionRef} style={{ position: "relative", zIndex: 2, height: `${N * 100}vh` }}>
       <div style={{
         position: "sticky", top: 0, height: "100vh",
         display: "flex", alignItems: "center", justifyContent: "center",
-        perspective: 1600, overflow: "visible",
+        overflow: "hidden",
       }}>
-        {/* glow behind the active device */}
         <div style={{
           position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-          width: "70vmin", height: "70vmin", borderRadius: "50%", pointerEvents: "none",
+          width: "80vmin", height: "80vmin", borderRadius: "50%", pointerEvents: "none",
           background: `radial-gradient(circle, rgba(${t.accentRgb},0.07), transparent 68%)`,
         }} />
 
-        {/* heading */}
-        <div style={{ position: "absolute", top: "clamp(70px, 11vh, 120px)", left: 0, right: 0, textAlign: "center", padding: "0 20px", zIndex: 70, pointerEvents: "none" }}>
-          <div className="section-label" style={{ marginBottom: 6 }}>Keep scrolling</div>
-          <h2 style={{
-            fontFamily: "'Syne', sans-serif", fontWeight: 800,
-            fontSize: "clamp(24px, 4vw, 44px)", color: t.text,
-            letterSpacing: "-0.03em", lineHeight: 1.05, margin: 0,
+        {/* compact top label — leaves the stage free for the screen */}
+        <div style={{
+          position: "absolute", top: "clamp(72px, 9vh, 104px)", left: 0, right: 0,
+          textAlign: "center", padding: "0 20px", zIndex: 70, pointerEvents: "none",
+        }}>
+          <div style={{
+            fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: ".3em",
+            textTransform: "uppercase", color: t.accent, opacity: .75, marginBottom: 5,
           }}>
-            The <span style={{ color: t.accent }}>reel</span> deal
-          </h2>
+            {String(active + 1).padStart(2, "0")} / {String(N).padStart(2, "0")} · {current.kind === "short" ? "Short" : "Full Video"}
+          </div>
+          <div style={{
+            fontFamily: "'Syne', sans-serif", fontWeight: 800,
+            fontSize: "clamp(17px, 2.4vw, 26px)", color: t.text, letterSpacing: "-0.02em",
+          }}>{current.title}</div>
         </div>
 
-        {/* devices */}
         {items.map((item, i) => (
           <Stagepiece
             key={item.id}
@@ -259,31 +255,19 @@ export default function ScrollShowcase({ items, galleryHref = "#gallery" }) {
             isPlaying={playing === i}
             soundOn={soundOn}
             onPlayRef={(el) => { frameRefs.current[i] = el; }}
-            t={t} mode={mode} isMob={isMob}
+            t={t} mode={mode}
           />
         ))}
 
-        {/* caption + controls */}
+        {/* bottom rail — wrapper ignores pointers so it can never sit on top
+            of the player's control bar; only the controls themselves catch clicks */}
         <div style={{
-          position: "absolute", bottom: "clamp(26px, 6vh, 64px)", left: 0, right: 0,
-          display: "flex", flexDirection: "column", alignItems: "center", gap: 14,
-          zIndex: 70, padding: "0 20px",
+          position: "absolute", bottom: "clamp(16px, 3vh, 34px)", left: 0, right: 0,
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+          zIndex: 70, padding: "0 20px", pointerEvents: "none",
         }}>
-          <div style={{ textAlign: "center", minHeight: 52 }}>
-            <div style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: ".3em",
-              textTransform: "uppercase", color: t.accent, opacity: .75, marginBottom: 6,
-            }}>
-              {String(active + 1).padStart(2, "0")} / {String(N).padStart(2, "0")} · {current.kind === "short" ? "Short" : "Full Video"}
-            </div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "clamp(18px, 2.6vw, 26px)", color: t.text }}>
-              {current.title}
-            </div>
-          </div>
-
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-            {/* segment rail */}
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, pointerEvents: "auto" }}>
               {items.map((_, i) => (
                 <button
                   key={i}
@@ -301,44 +285,32 @@ export default function ScrollShowcase({ items, galleryHref = "#gallery" }) {
             <button
               onClick={toggleSound}
               style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                padding: "7px 14px", borderRadius: 40, cursor: "pointer",
+                ...pill,
                 border: `1px solid ${soundOn ? `rgba(${t.accentRgb},.5)` : t.border}`,
                 background: soundOn ? `rgba(${t.accentRgb},.12)` : "transparent",
                 color: soundOn ? t.accent : t.textMuted,
-                fontFamily: "'Space Mono', monospace", fontSize: 10,
-                letterSpacing: ".14em", textTransform: "uppercase", transition: "all .3s ease",
               }}
-            >
-              {soundOn ? "🔊 Sound on" : "🔇 Sound off"}
-            </button>
+            >{soundOn ? "🔊 Sound on" : "🔇 Sound off"}</button>
             <a
               href={watchUrl(current)} target="_blank" rel="noopener noreferrer"
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "7px 14px", borderRadius: 40,
-                border: `1px solid ${t.border}`, color: t.textMuted, textDecoration: "none",
-                fontFamily: "'Space Mono', monospace", fontSize: 10,
-                letterSpacing: ".14em", textTransform: "uppercase", transition: "all .3s ease",
-              }}
+              style={{ ...pill, border: `1px solid ${t.border}`, color: t.textMuted }}
               onMouseEnter={(e) => { e.currentTarget.style.color = t.accent; e.currentTarget.style.borderColor = `rgba(${t.accentRgb},.5)`; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = t.textMuted; e.currentTarget.style.borderColor = t.border; }}
             >YouTube ↗</a>
           </div>
 
-          {/* scroll hint early on, gallery CTA at the end */}
-          <div style={{ position: "relative", height: 54, width: "100%", display: "flex", justifyContent: "center" }}>
+          <div style={{ position: "relative", height: 48, width: "100%", display: "flex", justifyContent: "center" }}>
             <div style={{
               position: "absolute", display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-              opacity: progress < 0.12 ? 1 : 0, transition: "opacity .4s ease", pointerEvents: "none",
+              opacity: progress < 0.1 ? 1 : 0, transition: "opacity .4s ease",
             }}>
               <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: ".26em", color: t.textFaint, textTransform: "uppercase" }}>scroll</span>
-              <span style={{ width: 1, height: 26, background: `linear-gradient(to bottom, ${t.accent}, transparent)`, animation: "float 2.4s ease-in-out infinite" }} />
+              <span style={{ width: 1, height: 22, background: `linear-gradient(to bottom, ${t.accent}, transparent)`, animation: "float 2.4s ease-in-out infinite" }} />
             </div>
 
+            {/* opens the gallery in its own tab */}
             <a
-              href={galleryHref}
-              className="showcase-cta"
+              href={galleryHref} target="_blank" rel="noopener noreferrer"
               style={{
                 position: "absolute",
                 opacity: endish ? 1 : 0,
@@ -346,15 +318,16 @@ export default function ScrollShowcase({ items, galleryHref = "#gallery" }) {
                 pointerEvents: endish ? "auto" : "none",
                 transition: "all .55s cubic-bezier(.22,1,.36,1)",
                 display: "inline-flex", alignItems: "center", gap: 10,
-                padding: "14px 30px", borderRadius: 50,
+                padding: isMob ? "12px 22px" : "14px 30px", borderRadius: 50,
                 background: t.accent, color: t.onAccent, textDecoration: "none",
-                fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 14,
+                fontFamily: "'DM Sans', sans-serif", fontWeight: 700,
+                fontSize: isMob ? 13 : 14,
                 boxShadow: `0 10px 40px rgba(${t.accentRgb},.35)`,
                 whiteSpace: "nowrap",
               }}
             >
               See everything in the Gallery
-              <span aria-hidden="true">↓</span>
+              <span aria-hidden="true">↗</span>
             </a>
           </div>
         </div>

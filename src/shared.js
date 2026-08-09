@@ -14,6 +14,21 @@ export function usePrefersReducedMotion() {
   return reduced;
 }
 
+/* Single source of truth for the "small screen" breakpoint. */
+export function useIsMobile(breakpoint = 768) {
+  const [mobile, setMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < breakpoint : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const update = () => setMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [breakpoint]);
+  return mobile;
+}
+
 export function useInView(th = 0.1) {
   const ref = useRef(null);
   const [inView, setInView] = useState(false);

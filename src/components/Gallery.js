@@ -41,7 +41,7 @@ function GalleryCard({ item, index, t, mode }) {
               title={item.title}
               src={embedUrl(item, { autoplay: true, mute: false })}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
-              allow="autoplay; encrypted-media; picture-in-picture"
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
               allowFullScreen
             />
           ) : (

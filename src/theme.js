@@ -59,10 +59,12 @@ export const YOUTUBE_SHORTS = [
 ];
 
 /* Unified list driving the scroll showcase and the gallery.
-   kind: "short" renders in a phone, "video" renders in a laptop. */
+   kind: "short" renders in a phone, "video" renders in a laptop.
+   Order matters — the showcase plays through this list top to bottom,
+   so the full videos lead and the shorts follow. */
 export const MEDIA = [
-  ...YOUTUBE_SHORTS.map((s) => ({ ...s, kind: "short" })),
   ...YOUTUBE_VIDEOS.map((v) => ({ ...v, kind: "video" })),
+  ...YOUTUBE_SHORTS.map((s) => ({ ...s, kind: "short" })),
 ];
 
 export const CHANNELS = [
@@ -88,6 +90,7 @@ export const embedUrl = (item, { autoplay = false, mute = true } = {}) => {
     modestbranding: "1",
     playsinline: "1",
     enablejsapi: "1",
+    controls: "1", // keep YouTube's own bar: play/pause, seek, skip-ad, fullscreen
     autoplay: autoplay ? "1" : "0",
     mute: mute ? "1" : "0",
     loop: "1",
