@@ -11,7 +11,7 @@ on:
 permissions:
   contents: write
 
-# If you push twice quickly, don't let two deploys race each other —
+# If you push twice quickly, don't let two deploys race each other -
 # cancel the older run and let the newest one win.
 concurrency:
   group: deploy-pages

@@ -8,7 +8,7 @@ The form is built and validated, but it needs a free key before it can send mail
 into the "Create Access Key" box. That inbox gets the key within a minute.
 No account required.
 
-**Give it to the deployed site** — add it as a repository secret:
+**Give it to the deployed site** - add it as a repository secret:
 
 ```bash
 gh secret set WEB3FORMS_KEY
@@ -21,7 +21,7 @@ named exactly `WEB3FORMS_KEY`.
 The deploy workflow reads it automatically. If it's missing, the build still
 succeeds but prints a warning in the Actions log.
 
-**Give it to your own machine** — create `.env.local` in the project root:
+**Give it to your own machine** - create `.env.local` in the project root:
 
 ```
 REACT_APP_WEB3FORMS_KEY=your-key-here
@@ -44,7 +44,7 @@ is a real benefit and worth doing.
 It does **not** hide the key from visitors. Create React App inlines every
 `REACT_APP_*` value into the JavaScript bundle at build time, so it is
 readable in the shipped site regardless of where it was stored. That is
-acceptable for this particular key — a Web3Forms access key can only ever
+acceptable for this particular key - a Web3Forms access key can only ever
 deliver mail to the single address it was created for, so it can't be used to
 redirect enquiries.
 
@@ -52,7 +52,7 @@ The corollary matters: **never** put a genuine secret (payment credentials, a
 database password, a private API key) in a `REACT_APP_*` variable. It would be
 published to every visitor.
 
-If the key ever attracts spam, request a fresh one and replace the secret —
+If the key ever attracts spam, request a fresh one and replace the secret -
 rotation is the mitigation here, not secrecy.
 
 ---
@@ -98,14 +98,14 @@ gh auth refresh -s workflow
 ```
 
 Without it the push fails with *"refusing to allow an OAuth App to create or
-update workflow ... without `workflow` scope"*. Nothing else is affected —
+update workflow ... without `workflow` scope"*. Nothing else is affected -
 your other pushes work fine.
 
 ### If a deploy fails
 
 Actions sets `CI=true`, and Create React App treats **lint warnings as errors**
 when it's set. So an unused variable will fail the build instead of shipping.
-That's deliberate — it stops a broken build going live. The Actions log names
+That's deliberate - it stops a broken build going live. The Actions log names
 the file and line.
 
 If you'd rather warnings didn't block a deploy, change the build step in
@@ -119,7 +119,7 @@ If you'd rather warnings didn't block a deploy, change the build step in
 
 `npm run deploy` publishes straight from your working folder without
 committing. Handy for a quick fix, but the automatic deploy on the next push
-will overwrite it with whatever is on `main` — so don't rely on it for
+will overwrite it with whatever is on `main` - so don't rely on it for
 anything you haven't committed.
 
 ---
@@ -142,7 +142,7 @@ Once you buy a domain (e.g. `omdagur.com`):
    | CNAME | www   | nishant2306.github.io.   |
 
    Some registrars write the apex as blank or as the domain itself rather
-   than `@` — they all mean the same thing. Leave any pre-existing parking
+   than `@` - they all mean the same thing. Leave any pre-existing parking
    or redirect records off, or they'll fight these.
 
 2. Create a file **`public/CNAME`** containing just your domain, no protocol
@@ -164,7 +164,7 @@ Once you buy a domain (e.g. `omdagur.com`):
    tick **Enforce HTTPS** once the certificate is issued (usually minutes,
    occasionally up to an hour).
 
-Nothing about the booking form changes on a custom domain — the key still
+Nothing about the booking form changes on a custom domain - the key still
 comes from the same secret, and Web3Forms delivers to the address the key was
 created for regardless of which domain the form is served from.
 
