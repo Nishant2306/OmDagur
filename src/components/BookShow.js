@@ -3,19 +3,35 @@ import { T, useTheme, TICKETS_URL } from "../theme";
 import { Reveal } from "../shared";
 
 /* ═══════════════════════════════════════════════════════════
-   SETUP - one step, takes about a minute:
+   SETUP - the key is supplied at BUILD TIME, not written here.
 
-   1. Go to  https://web3forms.com
-   2. Type  omdagur1@gmail.com  into the "Create Access Key" box
-   3. Check that inbox, copy the access key they email you
-   4. Paste it below, replacing PASTE_YOUR_ACCESS_KEY_HERE
+   Get it: https://web3forms.com -> type omdagur1@gmail.com into the
+   "Create Access Key" box -> they email the key to that inbox.
+
+   Then provide it in two places:
+
+     Deployed  GitHub repo -> Settings -> Secrets and variables ->
+               Actions -> new secret named WEB3FORMS_KEY.
+               The deploy workflow passes it in automatically.
+
+     Local     a file called .env.local in the project root:
+                 REACT_APP_WEB3FORMS_KEY=your-key-here
+               .env.local is gitignored, so it never gets committed.
+               Restart `npm start` after creating it.
 
    Every submission then arrives as an email at omdagur1@gmail.com.
-   The key is safe to commit - Web3Forms keys are designed to be
-   public, they only ever deliver to the address they're bound to.
 
-   Until it's set, the form falls back to opening the visitor's own
-   mail app with everything pre-filled, so it is never a dead end.
+   Worth knowing: this keeps the key out of the repo and out of git
+   history, which is what stops bots that scrape GitHub for keys.
+   It does NOT hide it from visitors - Create React App inlines
+   REACT_APP_* values into the JavaScript bundle, so it is readable
+   in the shipped site either way. That's acceptable here because a
+   Web3Forms key can only ever deliver mail to the one address it
+   was created for. Never put a real secret (payment or database
+   credentials) in a REACT_APP_* variable.
+
+   With no key set the form still works - it falls back to opening
+   the visitor's own mail app pre-filled, so it is never a dead end.
    ═══════════════════════════════════════════════════════════ */
 const WEB3FORMS_KEY = process.env.REACT_APP_WEB3FORMS_KEY || "PASTE_YOUR_ACCESS_KEY_HERE";
 const TO_EMAIL = "omdagur1@gmail.com";
