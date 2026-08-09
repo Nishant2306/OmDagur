@@ -21,3 +21,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# local env (never commit real keys)
+.env.local
+
+# editor / tooling
+.claude/
