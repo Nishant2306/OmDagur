@@ -181,15 +181,16 @@ export default function Footer() {
 
       {/* giant clickable name */}
       <div
-        ref={nameWrapRef}
         onClick={burst}
         title="go on, poke it"
-        style={{
-          position: "relative", cursor: "pointer", padding: "10px 10px 0",
-          userSelect: "none", overflow: "hidden",
-          display: "flex", justifyContent: "center",
-        }}
+        style={{ position: "relative", cursor: "pointer", userSelect: "none" }}
       >
+        {/* Only the text is clipped — the emoji burst below must stay free to
+            fly outside this box. */}
+        <div
+          ref={nameWrapRef}
+          style={{ overflow: "hidden", display: "flex", justifyContent: "center", padding: "10px 10px 0" }}
+        >
         <div
           ref={nameRowRef}
           onMouseLeave={() => setHovered(-1)}
@@ -219,6 +220,7 @@ export default function Footer() {
               >{ch === " " ? " " : ch}</span>
             );
           })}
+          </div>
         </div>
 
         {bursts.map((b) => (
