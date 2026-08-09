@@ -24,10 +24,16 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
+      # Pinned to 24 to match the npm that generated package-lock.json (npm 11).
+      # On Node 20 (npm 10) `npm ci` fails with "Missing: yaml@2.9.0 from lock
+      # file": react-scripts lists tailwindcss as an optional peer dependency,
+      # and npm 10 and 11 disagree about whether to pull that subtree in, so
+      # npm 10 wants packages the lockfile doesn't record. Same npm, no
+      # disagreement.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
