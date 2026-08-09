@@ -4,7 +4,7 @@ import { usePrefersReducedMotion } from "../shared";
 
 const NAME = "OM DAGUR";
 
-/* Timeline in ms — kept in sync with the audio cue in ../audio.js
+/* Timeline in ms - kept in sync with the audio cue in ../audio.js
    and with the percentages in the keyframes below (of TOTAL). */
 const TOTAL = 2000;
 const TYPE_START = 780;
@@ -47,6 +47,18 @@ export default function Loader({ onDone }) {
     audioRef.current = playLoaderCue();
     if (audioRef.current && audioRef.current.blocked) setNeedsTap(true);
 
+    /* Browsers refuse to start audio until the user has interacted with the
+       page, so a first visit is silent no matter what we do here. Rather than
+       relying on them finding the small sound button, treat ANY interaction
+       anywhere as the unlock - a stray click, a tap, a key press. */
+    const unlockFromAnyGesture = async () => {
+      if (!audioRef.current || !audioRef.current.blocked) return;
+      const ok = await audioRef.current.unlock();
+      if (ok) setNeedsTap(false);
+    };
+    const gestures = ["pointerdown", "touchstart", "keydown"];
+    gestures.forEach((g) => window.addEventListener(g, unlockFromAnyGesture, { once: true, passive: true }));
+
     const add = (fn, ms) => pending.push(setTimeout(fn, ms));
 
     for (let i = 1; i <= NAME.length; i++) add(() => setTyped(i), TYPE_START + i * TYPE_STEP);
@@ -59,6 +71,7 @@ export default function Loader({ onDone }) {
     return () => {
       pending.forEach(clearTimeout);
       window.removeEventListener("keydown", onKey);
+      gestures.forEach((g) => window.removeEventListener(g, unlockFromAnyGesture));
       document.body.style.overflow = prevOverflow;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,10 +188,16 @@ export default function Loader({ onDone }) {
         }
         .ldr-btn:hover { color: #FFD700; border-color: rgba(255,215,0,.5); }
         .ldr-skip { right: 26px; }
+        /* Centred and filled - on a first visit the browser blocks audio until
+           something is clicked, so this needs to read as the obvious action,
+           not a corner afterthought. */
         .ldr-sound {
-          left: 26px; color: #FFD700; border-color: rgba(255,215,0,.45);
+          left: 50%; bottom: 74px; transform: translateX(-50%);
+          color: #050505; background: #FFD700; border-color: #FFD700;
+          font-weight: 700; font-size: 12px; padding: 12px 26px;
           animation: ldrPulse 1.3s ease-in-out infinite;
         }
+        .ldr-sound:hover { color: #050505; background: #ffdf3d; border-color: #ffdf3d; }
 
         @keyframes ldrBeam {
           0%   { transform: rotate(-42deg) scaleY(.6); opacity: 0; }
@@ -288,7 +307,7 @@ export default function Loader({ onDone }) {
 
       {needsTap && (
         <button className="ldr-btn ldr-sound" onClick={unmute} aria-label="Turn sound on">
-          🔊 sound
+          🔊 tap for sound
         </button>
       )}
       <button className="ldr-btn ldr-skip" onClick={finish}>skip</button>

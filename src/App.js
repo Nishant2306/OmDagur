@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { T, ThemeCtx, useTheme, MEDIA, CHANNELS, SOCIALS } from "./theme";
+import { T, ThemeCtx, useTheme, MEDIA, CHANNELS, SOCIALS, TICKETS_URL } from "./theme";
 import { Reveal, GlitchText, useIsMobile } from "./shared";
 import InteractiveBackground from "./components/InteractiveBackground";
 import Loader from "./components/Loader";
@@ -11,11 +11,14 @@ import Footer from "./components/Footer";
 
 const GALLERY_HASH = "#/gallery";
 
+/* "Book a Show" = buy a ticket to Om's own gig (BookMyShow).
+   "Invite Me to Perform" = hire him for your event (the enquiry form). */
 const NAV_ITEMS = [
   { label: "Watch", href: "#showcase" },
-  { label: "Gallery", href: GALLERY_HASH, newTab: true },
+  { label: "Gallery", href: GALLERY_HASH },
   { label: "Channels", href: "#channels" },
-  { label: "Book a Show", href: "#book" },
+  { label: "Book a Show", href: TICKETS_URL, newTab: true },
+  { label: "Invite Me", href: "#book", cta: true },
 ];
 
 const isGalleryRoute = () =>
@@ -67,7 +70,7 @@ function SubscribeBtn({ channel }) {
   return (
     <a href={`${channel.url}?sub_confirmation=1`} target="_blank" rel="noopener noreferrer" onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "14px 28px", borderRadius: 50, background: h ? "#ff0000" : "rgba(255,0,0,0.85)", color: "#fff", textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 14, transition: "all 0.3s ease", transform: h ? "scale(1.05)" : "scale(1)", boxShadow: h ? "0 8px 30px rgba(255,0,0,0.4)" : "0 4px 15px rgba(255,0,0,0.2)" }}>
       <svg width="20" height="14" viewBox="0 0 20 14" fill="none" aria-hidden="true"><path d="M19.6 2.2C19.4.8 18.2.2 17 .1 14.5 0 10 0 10 0S5.5 0 3 .1C1.8.2.6.8.4 2.2.1 3.6 0 5 0 7s.1 3.4.4 4.8c.2 1.4 1.4 2 2.6 2.1C5.5 14 10 14 10 14s4.5 0 7-.1c1.2-.1 2.4-.7 2.6-2.1.3-1.4.4-2.8.4-4.8s-.1-3.4-.4-4.8z" fill="#fff" /><path d="M8 10l5.2-3L8 4v6z" fill="#ff0000" /></svg>
-      Subscribe — {channel.label}
+      Subscribe - {channel.label}
     </a>
   );
 }
@@ -80,7 +83,7 @@ function Chrome({ mode, children }) {
       <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
       <style>{`
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-        /* overflow-x: clip (not hidden) — "hidden" turns an ancestor into a
+        /* overflow-x: clip (not hidden) - "hidden" turns an ancestor into a
            scroll container, which silently breaks position:sticky used by
            the scroll showcase. "clip" crops overflow without that side effect. */
         html { scroll-behavior: smooth; overflow-x: clip; scroll-padding-top: 88px; }
@@ -148,7 +151,17 @@ export default function OmDagurWebsite() {
   useEffect(() => {
     const h = () => setScrollY(window.scrollY);
     window.addEventListener("scroll", h, { passive: true });
-    const onHash = () => setRoute(isGalleryRoute() ? "gallery" : "home");
+    const onHash = () => {
+      const gallery = isGalleryRoute();
+      setRoute(gallery ? "gallery" : "home");
+      /* Coming back from the gallery via a section link (#book, #showcase…):
+         the target only exists once the home route has rendered, so the
+         browser's own scroll-to-anchor has nothing to find. */
+      if (!gallery) {
+        const id = window.location.hash.slice(1);
+        if (id) setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }), 80);
+      }
+    };
     window.addEventListener("hashchange", onHash);
     return () => {
       window.removeEventListener("scroll", h);
@@ -156,7 +169,7 @@ export default function OmDagurWebsite() {
     };
   }, []);
 
-  /* The WebGL hero scene is heavy — desktop only. */
+  /* The WebGL hero scene is heavy - desktop only. */
   useEffect(() => {
     if (isMob || route !== "home" || UnicornScene) return;
     let cancelled = false;
@@ -191,9 +204,9 @@ export default function OmDagurWebsite() {
             {NAV_ITEMS.map((item) => (
               <a key={item.label} href={item.href}
                 {...(item.newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                style={{ color: item.href === "#book" ? t.accent : t.textMuted, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: item.href === "#book" ? 700 : 500, transition: "color 0.3s" }}
+                style={{ color: item.cta ? t.accent : t.textMuted, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: item.cta ? 700 : 500, transition: "color 0.3s" }}
                 onMouseEnter={(e) => { e.target.style.color = t.accent; }}
-                onMouseLeave={(e) => { e.target.style.color = item.href === "#book" ? t.accent : t.textMuted; }}>
+                onMouseLeave={(e) => { e.target.style.color = item.cta ? t.accent : t.textMuted; }}>
                 {item.label}{item.newTab ? " ↗" : ""}
               </a>
             ))}
@@ -244,10 +257,14 @@ export default function OmDagurWebsite() {
                   onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 30px rgba(${t.accentRgb},0.4)`; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 20px rgba(${t.accentRgb},0.3)`; }}
                 >▶ Watch Now</a>
-                <a href="#book" style={{ padding: "14px 32px", borderRadius: 50, background: "transparent", border: `1px solid ${t.border}`, color: t.text, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, transition: "all 0.3s" }}
+                <a href={TICKETS_URL} target="_blank" rel="noopener noreferrer" style={{ padding: "14px 32px", borderRadius: 50, background: "transparent", border: `1px solid ${t.border}`, color: t.text, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, transition: "all 0.3s" }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.accent; e.currentTarget.style.color = t.accent; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text; }}
-                >Book a Show</a>
+                >🎫 Book a Show ↗</a>
+                <a href="#book" style={{ padding: "14px 32px", borderRadius: 50, background: "transparent", border: `1px solid rgba(${t.accentRgb},0.45)`, color: t.accent, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, transition: "all 0.3s" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = `rgba(${t.accentRgb},0.12)`; e.currentTarget.style.borderColor = t.accent; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = `rgba(${t.accentRgb},0.45)`; }}
+                >Invite Me to Perform</a>
               </div>
               <div className="hero-socials" style={{ opacity: loaded ? 1 : 0, transition: "all 1s ease 0.75s", display: "flex", gap: 16, marginTop: 32 }}>
                 {[

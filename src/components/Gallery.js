@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { T, useTheme, embedUrl, watchUrl } from "../theme";
-import { Reveal, Thumb, PlayGlyph } from "../shared";
+import { Reveal, Thumb, PlayGlyph, postToPlayer } from "../shared";
 
 const FILTERS = [
   { id: "all", label: "Everything" },
@@ -12,8 +12,23 @@ function GalleryCard({ item, index, t, mode }) {
   const [playing, setPlaying] = useState(false);
   const [hov, setHov] = useState(false);
   const isShort = item.kind === "short";
+  const cardRef = useRef(null);
+  const frameRef = useRef(null);
 
-  // The span class must sit on the grid's direct child — that's this Reveal,
+  /* Scrolling a playing card out of view pauses it, so audio doesn't trail
+     you down the page. Paused rather than unmounted, so scrolling back keeps
+     your position. */
+  useEffect(() => {
+    if (!playing || !cardRef.current) return;
+    const io = new IntersectionObserver(
+      ([e]) => { if (!e.isIntersecting) postToPlayer(frameRef.current, "pauseVideo"); },
+      { threshold: 0 }
+    );
+    io.observe(cardRef.current);
+    return () => io.disconnect();
+  }, [playing]);
+
+  // The span class must sit on the grid's direct child - that's this Reveal,
   // not the card inside it.
   return (
     <Reveal
@@ -22,6 +37,7 @@ function GalleryCard({ item, index, t, mode }) {
       style={{ height: "100%" }}
     >
       <div
+        ref={cardRef}
         className="gal-card"
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
@@ -38,6 +54,7 @@ function GalleryCard({ item, index, t, mode }) {
         <div className={`gal-media ${isShort ? "gal-media-short" : "gal-media-video"}`} style={{ position: "relative", width: "100%", background: t.playBg, overflow: "hidden" }}>
           {playing ? (
             <iframe
+              ref={frameRef}
               title={item.title}
               src={embedUrl(item, { autoplay: true, mute: false })}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}

@@ -1,21 +1,22 @@
 import { useState, useRef, useLayoutEffect } from "react";
-import { T, useTheme, CHANNELS } from "../theme";
+import { T, useTheme, CHANNELS, TICKETS_URL } from "../theme";
 
 const NAME = "OM DAGUR";
 const CONFETTI = ["😂", "🎤", "✨", "🤣", "🎭", "💛", "🎉", "🔥", "😭", "🎪"];
 
 const NAV = [
   { label: "Watch", href: "#showcase" },
-  { label: "Gallery", href: "#gallery" },
+  { label: "Gallery", href: "#/gallery" },
   { label: "Channels", href: "#channels" },
-  { label: "Book a Show", href: "#book" },
+  { label: "Invite Me to Perform", href: "#book" },
+  { label: "Book a Show", href: TICKETS_URL, external: true },
 ];
 
 const FOLLOW = [
   { label: "Instagram", href: "https://www.instagram.com/omdagur1" },
   { label: "Threads", href: "https://www.threads.com/@omdagur1" },
-  { label: "YouTube — Stand Up", href: "https://www.youtube.com/@omdagur1" },
-  { label: "YouTube — Music", href: "https://www.youtube.com/@omdagur" },
+  { label: "YouTube - Stand Up", href: "https://www.youtube.com/@omdagur1" },
+  { label: "YouTube - Music", href: "https://www.youtube.com/@omdagur" },
 ];
 
 export default function Footer() {
@@ -30,7 +31,7 @@ export default function Footer() {
      footer and got cropped at both ends ("M DAGU"). Rather than guessing a font
      size, measure the text and scale it down to fit.
 
-     The row is width:max-content so its offsetWidth is the true natural width —
+     The row is width:max-content so its offsetWidth is the true natural width -
      as a normal-width flex container the letters simply overflowed it, and
      scrollWidth ignored the overflow on the left, under-reporting the width. */
   const nameWrapRef = useRef(null);
@@ -54,7 +55,7 @@ export default function Footer() {
       ro.observe(nameWrapRef.current);
     }
     window.addEventListener("resize", measure);
-    // Re-measure after the webfont swaps in — Syne is wider than the fallback.
+    // Re-measure after the webfont swaps in - Syne is wider than the fallback.
     if (document.fonts?.ready) document.fonts.ready.then(measure).catch(() => {});
     return () => {
       window.removeEventListener("resize", measure);
@@ -138,22 +139,38 @@ export default function Footer() {
           <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: t.textMuted, lineHeight: 1.75, maxWidth: 330, margin: 0 }}>
             I'm a stand-up comic turning desi struggles into punchlines. Got a stage, an office party or a fest? Let's talk.
           </p>
-          <a href="#book" style={{
-            display: "inline-flex", alignItems: "center", gap: 9, marginTop: 22,
-            padding: "13px 26px", borderRadius: 50,
-            background: t.accent, color: t.onAccent, textDecoration: "none",
-            fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 14,
-            boxShadow: `0 8px 26px rgba(${t.accentRgb},.28)`, transition: "transform .3s ease",
-          }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
-          >🎫 Book a Show</a>
+          <div style={{ display: "flex", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
+            <a href="#book" style={{
+              display: "inline-flex", alignItems: "center", gap: 9,
+              padding: "13px 24px", borderRadius: 50,
+              background: t.accent, color: t.onAccent, textDecoration: "none",
+              fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 14,
+              boxShadow: `0 8px 26px rgba(${t.accentRgb},.28)`, transition: "transform .3s ease",
+            }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
+            >🎤 Invite Me to Perform</a>
+            <a href={TICKETS_URL} target="_blank" rel="noopener noreferrer" style={{
+              display: "inline-flex", alignItems: "center", gap: 9,
+              padding: "13px 24px", borderRadius: 50,
+              background: "transparent", border: `1px solid ${t.border}`,
+              color: t.text, textDecoration: "none",
+              fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 14,
+              transition: "all .3s ease",
+            }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.accent; e.currentTarget.style.color = t.accent; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text; }}
+            >🎫 Book a Show ↗</a>
+          </div>
         </div>
 
         <div>
           <div style={colTitle}>Explore</div>
           {NAV.map((l) => (
-            <a key={l.label} href={l.href} style={linkStyle} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>{l.label}</a>
+            <a key={l.label} href={l.href} style={linkStyle} onMouseEnter={hoverIn} onMouseLeave={hoverOut}
+              {...(l.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+              {l.label}{l.external ? " ↗" : ""}
+            </a>
           ))}
         </div>
 
@@ -185,7 +202,7 @@ export default function Footer() {
         title="go on, poke it"
         style={{ position: "relative", cursor: "pointer", userSelect: "none" }}
       >
-        {/* Only the text is clipped — the emoji burst below must stay free to
+        {/* Only the text is clipped - the emoji burst below must stay free to
             fly outside this box. */}
         <div
           ref={nameWrapRef}
@@ -236,13 +253,13 @@ export default function Footer() {
       {/* bottom bar */}
       <div className="ft-bottom">
         <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: t.textFaint }}>
-          © {new Date().getFullYear()} Om Dagur — making India laugh, one joke at a time.
+          © {new Date().getFullYear()} Om Dagur - making India laugh, one joke at a time.
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
           <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: t.textFaint }}>
             {tickles > 0
-              ? `${tickles} ${tickles === 1 ? "poke" : "pokes"} — keep going 👀`
-              : "psst — click the big name"}
+              ? `${tickles} ${tickles === 1 ? "poke" : "pokes"} - keep going 👀`
+              : "psst - click the big name"}
           </span>
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}

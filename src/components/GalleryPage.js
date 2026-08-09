@@ -3,7 +3,7 @@ import { T, useTheme } from "../theme";
 import Gallery from "./Gallery";
 import Footer from "./Footer";
 
-/* Standalone gallery, reached at #/gallery — opened in its own tab from the
+/* Standalone gallery, reached at #/gallery - opened in its own tab from the
    showcase CTA and the nav. Hash routing keeps it working on GitHub Pages
    with no server rewrite rules. */
 export default function GalleryPage({ items, homeHref = "#top" }) {
@@ -13,7 +13,7 @@ export default function GalleryPage({ items, homeHref = "#top" }) {
   useEffect(() => {
     window.scrollTo(0, 0);
     const prev = document.title;
-    document.title = "Gallery — Om Dagur";
+    document.title = "Gallery - Om Dagur";
     return () => { document.title = prev; };
   }, []);
 

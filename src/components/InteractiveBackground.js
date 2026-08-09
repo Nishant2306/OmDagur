@@ -11,7 +11,7 @@ import { usePrefersReducedMotion } from "../shared";
    was left to `auto`; because a canvas with width:100% and
    height:auto scales by its intrinsic aspect ratio, the drawing
    buffer and the displayed box disagreed, so every point was
-   painted slightly off — an error that grew the further down
+   painted slightly off - an error that grew the further down
    the page you scrolled. That was the cursor-trail offset.
    ═══════════════════════════════════════════════════════════ */
 

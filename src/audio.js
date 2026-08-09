@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   Loader sound — synthesised live with the Web Audio API.
+   Loader sound - synthesised live with the Web Audio API.
    No mp3 file, no download weight, no licensing to worry about.
 
    The cue is a "mic check": three taps on a mic capsule, then a
@@ -43,7 +43,7 @@ function micTap(ctx, out, at, gain = 1) {
   click.start(at); click.stop(at + 0.06);
 }
 
-/* Crowd swell — filtered noise with a wobbling band, roughly "applause". */
+/* Crowd swell - filtered noise with a wobbling band, roughly "applause". */
 function crowdSwell(ctx, out, at, dur = 1.5) {
   const src = ctx.createBufferSource();
   src.buffer = getNoise(ctx);
@@ -93,7 +93,7 @@ function blowOut(ctx, out, at) {
  * Returns a handle, or null when Web Audio is unavailable.
  *
  * `blocked` is true when the browser suspended the context because the
- * user hasn't interacted with the page yet — the UI shows an unmute
+ * user hasn't interacted with the page yet - the UI shows an unmute
  * button in that case and calls `unlock()` on click.
  */
 export function playLoaderCue() {

@@ -116,7 +116,7 @@ export default function Marquee() {
               letterSpacing: ".2em", textTransform: "uppercase",
               border: `1px solid ${t.onAccent}`, borderRadius: 30, padding: "5px 12px",
               opacity: hot ? 1 : 0.5, transition: "opacity .25s ease",
-            }}>Book →</span>
+            }}>Invite →</span>
           </a>
         );
       })}

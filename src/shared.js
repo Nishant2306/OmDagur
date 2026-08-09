@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { T, useTheme, thumbUrl } from "./theme";
+import { T, useTheme, thumbCandidates } from "./theme";
 
-/* Respects the OS "reduce motion" setting — we tone down the heavy stuff for it. */
+/* Command a YouTube iframe (mute/unMute/pauseVideo/playVideo) without
+   touching its src, so the embed never reloads. Requires enablejsapi=1. */
+export const postToPlayer = (el, func) => {
+  try {
+    el?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
+  } catch { /* iframe not ready yet */ }
+};
+
+/* Respects the OS "reduce motion" setting - we tone down the heavy stuff for it. */
 export function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -72,16 +80,31 @@ export function GlitchText({ text }) {
   );
 }
 
-/* YouTube thumbnail with automatic fallback: maxresdefault 404s on many
-   uploads (especially Shorts) and yields a grey 120x90 placeholder. */
+/* YouTube's "no such thumbnail" response is NOT an error the browser reports:
+   img.youtube.com answers a missing maxresdefault.jpg with a decodable grey
+   120x90 placeholder, so `onError` never fires and the card just shows grey.
+   That is why Dastaan-e-Breakup (0aYCAbDr5_A) had no preview image.
+
+   So we check the decoded size as well as listening for errors. Every real
+   thumbnail is at least 480px wide (hqdefault 480x360, sd 640x480,
+   maxres 1280x720), so anything narrower is the placeholder. */
+const PLACEHOLDER_MAX_W = 200;
+
 export function Thumb({ item, style = {}, alt }) {
-  const [src, setSrc] = useState(thumbUrl(item, true));
+  const candidates = thumbCandidates(item);
+  const [idx, setIdx] = useState(0);
+  useEffect(() => { setIdx(0); }, [item.embedId]);
+
+  // Capped at the last candidate so a final failure stops rather than looping.
+  const advance = () => setIdx((i) => (i < candidates.length - 1 ? i + 1 : i));
+
   return (
     <img
-      src={src}
+      src={candidates[Math.min(idx, candidates.length - 1)]}
       alt={alt || item.title}
       loading="lazy"
-      onError={() => setSrc(`https://img.youtube.com/vi/${item.embedId}/hqdefault.jpg`)}
+      onError={advance}
+      onLoad={(e) => { if (e.currentTarget.naturalWidth <= PLACEHOLDER_MAX_W) advance(); }}
       style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", ...style }}
     />
   );

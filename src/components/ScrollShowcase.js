@@ -1,15 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { T, useTheme, embedUrl, watchUrl } from "../theme";
-import { Thumb, PlayGlyph, usePrefersReducedMotion, useIsMobile } from "../shared";
+import { Thumb, PlayGlyph, usePrefersReducedMotion, useIsMobile, postToPlayer as post } from "../shared";
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
-/* Tell the YouTube iframe API to mute/unmute without reloading the embed. */
-const post = (el, func) => {
-  try {
-    el?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
-  } catch { /* iframe not ready yet */ }
-};
+/* Scroll distance allotted to each item, in vh. Higher = the stack advances
+   more slowly, giving each embed time to load before it's scrolled past. */
+const STEP_VH = 135;
 
 /* ── Device shells ───────────────────────────────────────── */
 
@@ -75,7 +72,7 @@ function LaptopShell({ t, active, children }) {
 
 /* ── One item on the stage ───────────────────────────────── */
 
-function Stagepiece({ item, offset, isPlaying, soundOn, onPlayRef, t, mode }) {
+function Stagepiece({ item, offset, isActive, isPlaying, soundOn, onPlayRef, t, mode }) {
   const a = Math.abs(offset);
   // Nothing beyond the immediate neighbours needs to exist.
   if (a > 1.25) return null;
@@ -85,7 +82,6 @@ function Stagepiece({ item, offset, isPlaying, soundOn, onPlayRef, t, mode }) {
   const y = offset * 74;                       // vh
   const scale = Math.max(0.42, 1 - a * 0.44);
   const opacity = clamp(1 - a * 1.05, 0, 1);
-  const active = a < 0.35;
 
   const Shell = item.kind === "short" ? PhoneShell : LaptopShell;
 
@@ -97,15 +93,22 @@ function Stagepiece({ item, offset, isPlaying, soundOn, onPlayRef, t, mode }) {
         opacity,
         zIndex: 60 - Math.round(a * 10),
         willChange: "transform, opacity",
-        pointerEvents: active ? "auto" : "none",
+        /* Driven by the index, not by how close the scroll happens to have
+           landed. Gating on a distance threshold meant the centred item was
+           often still pointer-events:none, so YouTube's controls never
+           appeared on hover and clicks did nothing. */
+        pointerEvents: isActive ? "auto" : "none",
       }}
     >
-      <Shell t={t} active={active}>
+      <Shell t={t} active={isActive}>
         {isPlaying ? (
           <iframe
             ref={onPlayRef}
             title={item.title}
-            src={embedUrl(item, { autoplay: true, mute: !soundOn })}
+            /* Always mute=1 in the URL: browsers only allow autoplay when
+               muted. Sound is then turned on via postMessage, which also
+               means toggling it never reloads the embed. */
+            src={embedUrl(item, { autoplay: true, mute: true })}
             onLoad={(e) => { if (soundOn) post(e.currentTarget, "unMute"); }}
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
@@ -144,7 +147,9 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
 
   const [raw, setRaw] = useState(0);
   const [playing, setPlaying] = useState(-1);
-  const [soundOn, setSoundOn] = useState(false);
+  const [soundOn, setSoundOn] = useState(true);
+  // Whether the sticky stage is the thing you're actually looking at.
+  const [onStage, setOnStage] = useState(false);
 
   const N = items.length;
   const active = Math.round(raw);
@@ -161,6 +166,11 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
       if (scrollable <= 0) return;
       const p = clamp(-rect.top / scrollable, 0, 1);
       setRaw(p * (N - 1));
+      /* Tracked here rather than derived from `raw`, because `raw` is clamped:
+         once you scroll past the end it stays pinned at N-1, so nothing
+         changed and the last video kept playing off-screen. */
+      const mid = window.innerHeight * 0.5;
+      setOnStage(rect.top < mid && rect.bottom > mid);
     };
     const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(measure); } };
     const onVisible = () => { if (!document.hidden) { ticking = false; measure(); } };
@@ -176,18 +186,23 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
   }, [N]);
 
   /* Only mount an iframe once the stack has settled on an item, so a fast
-     scroll doesn't spin up five embeds. */
+     scroll doesn't spin up five embeds. Leaving the stage unmounts whatever
+     is playing, which is what stops audio following you down the page. */
   useEffect(() => {
     if (reduced) return;
     clearTimeout(settleTimer.current);
-    const el = sectionRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const mid = window.innerHeight * 0.5;
-    if (!(r.top < mid && r.bottom > mid)) { setPlaying(-1); return; }
+    if (!onStage) { setPlaying(-1); return; }
     settleTimer.current = setTimeout(() => setPlaying(active), 260);
     return () => clearTimeout(settleTimer.current);
-  }, [active, raw, reduced]);
+  }, [active, onStage, reduced]);
+
+  /* Belt and braces: pause the outgoing player the moment the active item
+     changes, before React gets round to unmounting its iframe. */
+  useEffect(() => {
+    Object.entries(frameRefs.current).forEach(([i, el]) => {
+      if (el && Number(i) !== playing) post(el, "pauseVideo");
+    });
+  }, [playing]);
 
   const toggleSound = useCallback(() => {
     setSoundOn((s) => {
@@ -218,7 +233,7 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
   };
 
   return (
-    <section id="showcase" ref={sectionRef} style={{ position: "relative", zIndex: 2, height: `${N * 100}vh` }}>
+    <section id="showcase" ref={sectionRef} style={{ position: "relative", zIndex: 2, height: `${N * STEP_VH}vh` }}>
       <div style={{
         position: "sticky", top: 0, height: "100vh",
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -230,7 +245,7 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
           background: `radial-gradient(circle, rgba(${t.accentRgb},0.07), transparent 68%)`,
         }} />
 
-        {/* compact top label — leaves the stage free for the screen */}
+        {/* compact top label - leaves the stage free for the screen */}
         <div style={{
           position: "absolute", top: "clamp(72px, 9vh, 104px)", left: 0, right: 0,
           textAlign: "center", padding: "0 20px", zIndex: 70, pointerEvents: "none",
@@ -252,6 +267,7 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
             key={item.id}
             item={item}
             offset={i - raw}
+            isActive={i === active}
             isPlaying={playing === i}
             soundOn={soundOn}
             onPlayRef={(el) => { frameRefs.current[i] = el; }}
@@ -259,7 +275,7 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
           />
         ))}
 
-        {/* bottom rail — wrapper ignores pointers so it can never sit on top
+        {/* bottom rail - wrapper ignores pointers so it can never sit on top
             of the player's control bar; only the controls themselves catch clicks */}
         <div style={{
           position: "absolute", bottom: "clamp(16px, 3vh, 34px)", left: 0, right: 0,
@@ -308,9 +324,9 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
               <span style={{ width: 1, height: 22, background: `linear-gradient(to bottom, ${t.accent}, transparent)`, animation: "float 2.4s ease-in-out infinite" }} />
             </div>
 
-            {/* opens the gallery in its own tab */}
+            {/* navigates to the gallery page in this same tab */}
             <a
-              href={galleryHref} target="_blank" rel="noopener noreferrer"
+              href={galleryHref}
               style={{
                 position: "absolute",
                 opacity: endish ? 1 : 0,
@@ -327,7 +343,7 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
               }}
             >
               See everything in the Gallery
-              <span aria-hidden="true">↗</span>
+              <span aria-hidden="true">→</span>
             </a>
           </div>
         </div>

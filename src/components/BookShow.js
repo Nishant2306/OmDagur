@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { T, useTheme } from "../theme";
+import { T, useTheme, TICKETS_URL } from "../theme";
 import { Reveal } from "../shared";
 
 /* ═══════════════════════════════════════════════════════════
-   SETUP — one step, takes about a minute:
+   SETUP - one step, takes about a minute:
 
    1. Go to  https://web3forms.com
    2. Type  omdagur1@gmail.com  into the "Create Access Key" box
@@ -11,7 +11,7 @@ import { Reveal } from "../shared";
    4. Paste it below, replacing PASTE_YOUR_ACCESS_KEY_HERE
 
    Every submission then arrives as an email at omdagur1@gmail.com.
-   The key is safe to commit — Web3Forms keys are designed to be
+   The key is safe to commit - Web3Forms keys are designed to be
    public, they only ever deliver to the address they're bound to.
 
    Until it's set, the form falls back to opening the visitor's own
@@ -76,20 +76,20 @@ export default function BookShow() {
     [
       `Name: ${f.name}`,
       `Email: ${f.email}`,
-      `Phone / WhatsApp: ${f.phone || "—"}`,
+      `Phone / WhatsApp: ${f.phone || "-"}`,
       `Type of event: ${f.eventType}`,
-      `Preferred date: ${f.eventDate || "—"}`,
-      `City: ${f.city || "—"}`,
-      `Company / College / Venue: ${f.org || "—"}`,
-      `Expected audience: ${f.audience || "—"}`,
-      `Budget range: ${f.budget || "—"}`,
+      `Preferred date: ${f.eventDate || "-"}`,
+      `City: ${f.city || "-"}`,
+      `Company / College / Venue: ${f.org || "-"}`,
+      `Expected audience: ${f.audience || "-"}`,
+      `Budget range: ${f.budget || "-"}`,
       "",
       "Details:",
       f.message,
     ].join("\n");
 
   const openMailFallback = () => {
-    const subject = encodeURIComponent(`Booking enquiry — ${f.eventType || "Show"} — ${f.name}`);
+    const subject = encodeURIComponent(`Booking enquiry - ${f.eventType || "Show"} - ${f.name}`);
     const body = encodeURIComponent(plainText());
     window.location.href = `mailto:${TO_EMAIL}?subject=${subject}&body=${body}`;
     setStatus("mailto");
@@ -97,7 +97,7 @@ export default function BookShow() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (f.botcheck) return; // honeypot tripped — silently drop
+    if (f.botcheck) return; // honeypot tripped - silently drop
     if (!validate()) {
       document.querySelector(".bk-error-field")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
@@ -113,18 +113,18 @@ export default function BookShow() {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           access_key: WEB3FORMS_KEY,
-          subject: `🎤 Booking enquiry — ${f.eventType} — ${f.name}`,
-          from_name: "omdagur.com — Book a Show",
+          subject: `🎤 Booking enquiry - ${f.eventType} - ${f.name}`,
+          from_name: "omdagur.com - Book a Show",
           name: f.name,
           email: f.email,
           replyto: f.email,
-          phone: f.phone || "—",
+          phone: f.phone || "-",
           "Type of event": f.eventType,
-          "Preferred date": f.eventDate || "—",
-          City: f.city || "—",
-          "Company / College / Venue": f.org || "—",
-          "Expected audience": f.audience || "—",
-          "Budget range": f.budget || "—",
+          "Preferred date": f.eventDate || "-",
+          City: f.city || "-",
+          "Company / College / Venue": f.org || "-",
+          "Expected audience": f.audience || "-",
+          "Budget range": f.budget || "-",
           Details: f.message,
         }),
       });
@@ -188,8 +188,8 @@ export default function BookShow() {
           </h2>
           <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, color: t.textMuted, marginTop: 14, lineHeight: 1.7 }}>
             {status === "success"
-              ? <>Your enquiry just landed in my inbox. I'll get back to you within a couple of days — check your spam folder too, just in case.</>
-              : <>Your mail app should have opened with everything filled in. Just hit send — or write to <a href={`mailto:${TO_EMAIL}`} style={{ color: t.accent }}>{TO_EMAIL}</a> directly.</>}
+              ? <>Your enquiry just landed in my inbox. I'll get back to you within a couple of days - check your spam folder too, just in case.</>
+              : <>Your mail app should have opened with everything filled in. Just hit send - or write to <a href={`mailto:${TO_EMAIL}`} style={{ color: t.accent }}>{TO_EMAIL}</a> directly.</>}
           </p>
           <button
             onClick={() => setStatus("idle")}
@@ -218,12 +218,18 @@ export default function BookShow() {
 
       <Reveal>
         <div style={{ textAlign: "center", marginBottom: 44 }}>
-          <div className="section-label">Book a Show</div>
+          <div className="section-label">Invite Me to Perform</div>
           <h2 className="section-title" style={{ marginBottom: 14 }}>
             Get me on your <span style={{ color: t.accent }}>stage</span>
           </h2>
           <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 16, color: t.textMuted, maxWidth: 520, margin: "0 auto", lineHeight: 1.7 }}>
-            Office party, college fest, wedding, brand collab — if there's a crowd and a mic, I'm interested. Fill this in and it lands straight in my inbox.
+            Office party, college fest, wedding, brand collab - if there's a crowd and a mic, I'm interested. Fill this in and it lands straight in my inbox.
+          </p>
+          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: t.textFaint, marginTop: 14 }}>
+            Just after tickets to one of my own shows?{" "}
+            <a href={TICKETS_URL} target="_blank" rel="noopener noreferrer" style={{ color: t.accent, fontWeight: 600 }}>
+              Book a Show on BookMyShow ↗
+            </a>
           </p>
         </div>
       </Reveal>
@@ -234,7 +240,7 @@ export default function BookShow() {
           background: t.cardBg, border: `1px solid ${t.cardBorder}`,
           boxShadow: `0 24px 70px ${t.shadow}`,
         }}>
-          {/* honeypot — hidden from humans, catches naive bots */}
+          {/* honeypot - hidden from humans, catches naive bots */}
           <input
             type="checkbox" name="botcheck" tabIndex={-1} autoComplete="off"
             checked={!!f.botcheck} onChange={(e) => setF((p) => ({ ...p, botcheck: e.target.checked ? "1" : "" }))}

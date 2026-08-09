@@ -6,11 +6,11 @@ The form is built and validated, but it needs a free key before it can send mail
 
 1. Go to **https://web3forms.com**
 2. Type **omdagur1@gmail.com** into the "Create Access Key" box
-3. That inbox gets an email with an access key — copy it
+3. That inbox gets an email with an access key - copy it
 4. Open `src/components/BookShow.js` and replace `PASTE_YOUR_ACCESS_KEY_HERE`
    with the key (line ~26)
 
-Until you do this, the form still works — it falls back to opening the
+Until you do this, the form still works - it falls back to opening the
 visitor's own mail app with every field pre-filled, addressed to
 omdagur1@gmail.com. It is never a dead end, it just isn't automatic.
 
@@ -41,7 +41,7 @@ That builds the site and pushes `build/` to the `gh-pages` branch. Live at:
 
 First deploy takes 2–3 minutes to appear. After that it's usually under a minute.
 
-Note: `npm run deploy` publishes whatever is in your working folder — it does
+Note: `npm run deploy` publishes whatever is in your working folder - it does
 not require you to commit first. To also save your source history:
 
 ```bash
@@ -87,13 +87,13 @@ Once you buy a domain (e.g. `omdagur.com`):
 
 Almost everything lives in `src/theme.js`:
 
-- `YOUTUBE_VIDEOS` / `YOUTUBE_SHORTS` — add or remove media here. The scroll
+- `YOUTUBE_VIDEOS` / `YOUTUBE_SHORTS` - add or remove media here. The scroll
   showcase and the gallery both build themselves from this list, so adding a
   6th video automatically lengthens the showcase and adds a gallery card.
   Nothing else needs touching.
-- `CHANNELS`, `SOCIALS` — the channel cards and social buttons.
+- `CHANNELS`, `SOCIALS` - the channel cards and social buttons.
 
-The scrolling ribbon's wording is in `src/components/Marquee.js` — `BOOKABLE`
+The scrolling ribbon's wording is in `src/components/Marquee.js` - `BOOKABLE`
 (the yellow row, which links to the booking form) and `FLAVOUR` (the outlined
 row). Worth reviewing that these describe the kinds of gigs Om actually wants.
 
