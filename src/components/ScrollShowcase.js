@@ -37,8 +37,9 @@ function PlayerBar({ yt, t, mode, watchHref, isMob }) {
 
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: isMob ? 8 : 12,
-      padding: isMob ? "8px 12px" : "9px 16px", borderRadius: 40,
+      display: "flex", alignItems: "center", gap: isMob ? 6 : 12,
+      padding: isMob ? "7px 10px" : "9px 16px", borderRadius: 40,
+      boxSizing: "border-box",
       background: mode === "dark" ? "rgba(12,12,12,.82)" : "rgba(255,255,255,.7)",
       backdropFilter: "blur(14px)",
       border: `1px solid ${t.border}`,
@@ -114,7 +115,10 @@ function PhoneShell({ t, active, children }) {
     <div style={{
       position: "relative",
       aspectRatio: "9 / 16",
-      height: "min(64vh, 600px)",
+      /* Sized against what's left after the caption, the control bar and the
+         bottom rail. A plain vh cap let the device grow on tall windows until
+         it pushed the controls off the bottom of the stage. */
+      height: "min(calc(100vh - 275px), 580px)",
       borderRadius: 44,
       background: t.deviceShell,
       border: `2px solid ${active ? `rgba(${t.accentRgb},0.55)` : t.deviceEdge}`,
@@ -137,8 +141,11 @@ function PhoneShell({ t, active, children }) {
 
 function LaptopShell({ t, active, children }) {
   return (
-    // width is capped by viewport height too, so the lid never overflows the stage
-    <div style={{ width: "min(88vw, 1200px, 112vh)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+    /* The lid is 16:10, so its height is 0.625 x width; the third cap solves
+       that back from the height actually available once the caption, control
+       bar and rail have taken their share. Without it a tall window grew the
+       laptop until the controls were pushed out of view entirely. */
+    <div style={{ width: "min(88vw, 1200px, calc(160vh - 460px))", display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div style={{
         position: "relative", width: "100%", aspectRatio: "16 / 10",
         borderRadius: "16px 16px 5px 5px",
@@ -239,8 +246,11 @@ function Stagepiece({ item, offset, isActive, isPlaying, onPlayRef, onPlayerLoad
           </>
         )}
       </Shell>
+        {/* Sized against the viewport, not the device: the controls have an
+            intrinsic minimum width, and on a phone the device is narrower
+            than that, so matching its width just clipped the end buttons. */}
         {isPlaying && yt && (
-          <div style={{ width: "min(100%, 560px)" }}>
+          <div style={{ width: "min(94vw, 560px)", maxWidth: "94vw" }}>
             <PlayerBar yt={yt} t={t} mode={mode} isMob={isMob} watchHref={watchUrl(item)} />
           </div>
         )}
@@ -371,7 +381,7 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
     <section id="showcase" ref={sectionRef} style={{ position: "relative", zIndex: 2, height: `${N * STEP_VH}vh` }}>
       <div style={{
         position: "sticky", top: 0, height: "100vh",
-        display: "flex", alignItems: "center", justifyContent: "center",
+        display: "flex", flexDirection: "column", alignItems: "center",
         overflow: "hidden",
       }}>
         <div style={{
@@ -380,10 +390,15 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
           background: `radial-gradient(circle, rgba(${t.accentRgb},0.07), transparent 68%)`,
         }} />
 
-        {/* compact top label - leaves the stage free for the screen */}
+        {/* Caption, stage and rail are flex rows, not absolutely positioned
+            overlays. Centring the device in the whole viewport meant the
+            caption sat on top of it and the controls could be pushed past the
+            bottom edge; centring it in the band that's actually left over
+            makes both collisions impossible at any window shape. */}
         <div style={{
-          position: "absolute", top: "clamp(72px, 9vh, 104px)", left: 0, right: 0,
-          textAlign: "center", padding: "0 20px", zIndex: 70, pointerEvents: "none",
+          flex: "none", paddingTop: "clamp(64px, 7vh, 84px)",
+          textAlign: "center", padding: "clamp(64px, 7vh, 84px) 20px 0",
+          zIndex: 70, pointerEvents: "none",
         }}>
           <div style={{
             fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: ".3em",
@@ -393,10 +408,11 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
           </div>
           <div style={{
             fontFamily: "'Syne', sans-serif", fontWeight: 800,
-            fontSize: "clamp(17px, 2.4vw, 26px)", color: t.text, letterSpacing: "-0.02em",
+            fontSize: "clamp(15px, 2vw, 22px)", color: t.text, letterSpacing: "-0.02em",
           }}>{current.title}</div>
         </div>
 
+        <div style={{ flex: 1, position: "relative", width: "100%", minHeight: 0 }}>
         {items.map((item, i) => (
           <Stagepiece
             key={item.id}
@@ -414,13 +430,14 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
             t={t} mode={mode}
           />
         ))}
+        </div>
 
         {/* bottom rail - wrapper ignores pointers so it can never sit on top
             of the player's control bar; only the controls themselves catch clicks */}
         <div style={{
-          position: "absolute", bottom: "clamp(16px, 3vh, 34px)", left: 0, right: 0,
+          flex: "none", paddingBottom: "clamp(16px, 3vh, 34px)",
           display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
-          zIndex: 70, padding: "0 20px", pointerEvents: "none",
+          zIndex: 70, padding: "0 20px clamp(16px, 3vh, 34px)", pointerEvents: "none",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
             <div style={{ display: "flex", gap: 6, pointerEvents: "auto" }}>
@@ -448,7 +465,7 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
             )}
           </div>
 
-          <div style={{ position: "relative", height: 48, width: "100%", display: "flex", justifyContent: "center" }}>
+          <div style={{ position: "relative", height: 38, width: "100%", display: "flex", justifyContent: "center" }}>
             <div style={{
               position: "absolute", display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
               opacity: progress < 0.1 ? 1 : 0, transition: "opacity .4s ease",
