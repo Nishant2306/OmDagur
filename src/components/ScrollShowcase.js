@@ -18,16 +18,21 @@ const fmtTime = (s) => {
 function PlayerBar({ yt, t, mode, watchHref, isMob }) {
   const pct = yt.duration ? Math.min(100, (yt.time / yt.duration) * 100) : 0;
 
+  /* Deliberately high contrast. The first version used 6%-white borders on a
+     near-black fill, which on this page was effectively invisible - the
+     controls were on screen and being reported as missing. */
+  const line = mode === "dark" ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.22)";
+  const faceColor = mode === "dark" ? "rgba(255,255,255,.82)" : "rgba(0,0,0,.75)";
   const btn = (extra = {}) => ({
     display: "inline-flex", alignItems: "center", justifyContent: "center",
-    border: `1px solid ${t.border}`, background: "transparent",
-    color: t.textMuted, cursor: "pointer", borderRadius: 40,
-    transition: "all .2s ease", padding: 0, lineHeight: 1,
+    border: `1px solid ${line}`, background: "transparent",
+    color: faceColor, cursor: "pointer", borderRadius: 40,
+    transition: "all .2s ease", padding: 0, lineHeight: 1, flexShrink: 0,
     fontFamily: "'Space Mono', monospace", fontSize: 11,
     ...extra,
   });
-  const hoverOn = (e) => { e.currentTarget.style.color = t.accent; e.currentTarget.style.borderColor = `rgba(${t.accentRgb},.55)`; };
-  const hoverOff = (e) => { e.currentTarget.style.color = t.textMuted; e.currentTarget.style.borderColor = t.border; };
+  const hoverOn = (e) => { e.currentTarget.style.color = t.accent; e.currentTarget.style.borderColor = t.accent; };
+  const hoverOff = (e) => { e.currentTarget.style.color = faceColor; e.currentTarget.style.borderColor = line; };
 
   const seekFromClick = (e) => {
     if (!yt.duration) return;
@@ -40,10 +45,10 @@ function PlayerBar({ yt, t, mode, watchHref, isMob }) {
       display: "flex", alignItems: "center", gap: isMob ? 6 : 12,
       padding: isMob ? "7px 10px" : "9px 16px", borderRadius: 40,
       boxSizing: "border-box",
-      background: mode === "dark" ? "rgba(12,12,12,.82)" : "rgba(255,255,255,.7)",
+      background: mode === "dark" ? "rgba(26,26,26,.94)" : "rgba(255,255,255,.92)",
       backdropFilter: "blur(14px)",
-      border: `1px solid ${t.border}`,
-      boxShadow: `0 10px 34px ${t.shadow}`,
+      border: `1px solid ${line}`,
+      boxShadow: `0 10px 34px rgba(0,0,0,.5)`,
       pointerEvents: "auto",
       width: "100%",
     }}>
@@ -71,21 +76,27 @@ function PlayerBar({ yt, t, mode, watchHref, isMob }) {
         role="slider" aria-label="Seek" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} tabIndex={0}
         style={{ flex: 1, height: 16, display: "flex", alignItems: "center", cursor: "pointer", minWidth: 40 }}
       >
-        <div style={{ position: "relative", width: "100%", height: 4, borderRadius: 3, background: t.border }}>
+        <div style={{ position: "relative", width: "100%", height: 4, borderRadius: 3, background: line }}>
           <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: t.accent, borderRadius: 3 }} />
           <div style={{
             position: "absolute", top: "50%", left: `${pct}%`,
-            transform: "translate(-50%,-50%)", width: 10, height: 10,
+            transform: "translate(-50%,-50%)", width: 11, height: 11,
             borderRadius: "50%", background: t.accent,
+            boxShadow: "0 0 0 2px rgba(0,0,0,.55)",
           }} />
         </div>
       </div>
 
       {!isMob && (
-        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: t.textFaint, whiteSpace: "nowrap" }}>
+        <span style={{
+          fontFamily: "'Space Mono', monospace", fontSize: 10,
+          color: faceColor, opacity: .8, whiteSpace: "nowrap",
+          fontVariantNumeric: "tabular-nums", flexShrink: 0,
+        }}>
           {fmtTime(yt.time)} / {fmtTime(yt.duration)}
         </span>
       )}
+
 
       <button onClick={() => (yt.muted ? yt.unMute() : yt.mute())}
         aria-label={yt.muted ? "Unmute" : "Mute"}

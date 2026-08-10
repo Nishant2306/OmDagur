@@ -85,7 +85,6 @@ export function useYouTubeController(frameRef, playerKey) {
   };
 }
 
-/* Respects the OS "reduce motion" setting - we tone down the heavy stuff for it. */
 /* Body scroll lock, reference-counted.
    Two overlapping overlays (the entry curtains, and the loader behind them)
    each used to save and restore document.body.style.overflow themselves. The
