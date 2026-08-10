@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { playLoaderCue } from "../audio";
-import { usePrefersReducedMotion } from "../shared";
+import { usePrefersReducedMotion, useBodyScrollLock } from "../shared";
 
 const NAME = "OM DAGUR";
 
@@ -17,7 +17,6 @@ export default function Loader({ onDone }) {
   const [typed, setTyped] = useState(0);
   const [blown, setBlown] = useState(false);
   const [exiting, setExiting] = useState(false);
-  const [needsTap, setNeedsTap] = useState(false);
   const audioRef = useRef(null);
   const timers = useRef([]);
   const doneRef = useRef(false);
@@ -26,14 +25,19 @@ export default function Loader({ onDone }) {
     if (doneRef.current) return;
     doneRef.current = true;
     timers.current.forEach(clearTimeout);
-    if (audioRef.current) audioRef.current.stop();
+    /* Deliberately not stopping the audio here. If the browser blocked
+       autoplay, the cue is still armed and will fire on the visitor's first
+       click - which usually lands after this 2s loader has gone. Killing it
+       on exit would mean most people never hear anything at all. */
     setExiting(true);
     setTimeout(() => onDone(), 420);
   };
 
+  // Shared reference-counted lock: the entry curtains hold one at the same
+  // time, and two independent save/restore pairs left the page stuck hidden.
+  useBodyScrollLock(true);
+
   useEffect(() => {
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     // Captured so cleanup doesn't read a ref that may have been swapped out.
     const pending = timers.current;
 
@@ -41,23 +45,11 @@ export default function Loader({ onDone }) {
     if (reduced) {
       const t = setTimeout(finish, 600);
       pending.push(t);
-      return () => { clearTimeout(t); document.body.style.overflow = prevOverflow; };
+      return () => clearTimeout(t);
     }
 
+    // Arms itself and fires on the first real gesture if autoplay is blocked.
     audioRef.current = playLoaderCue();
-    if (audioRef.current && audioRef.current.blocked) setNeedsTap(true);
-
-    /* Browsers refuse to start audio until the user has interacted with the
-       page, so a first visit is silent no matter what we do here. Rather than
-       relying on them finding the small sound button, treat ANY interaction
-       anywhere as the unlock - a stray click, a tap, a key press. */
-    const unlockFromAnyGesture = async () => {
-      if (!audioRef.current || !audioRef.current.blocked) return;
-      const ok = await audioRef.current.unlock();
-      if (ok) setNeedsTap(false);
-    };
-    const gestures = ["pointerdown", "touchstart", "keydown"];
-    gestures.forEach((g) => window.addEventListener(g, unlockFromAnyGesture, { once: true, passive: true }));
 
     const add = (fn, ms) => pending.push(setTimeout(fn, ms));
 
@@ -71,17 +63,9 @@ export default function Loader({ onDone }) {
     return () => {
       pending.forEach(clearTimeout);
       window.removeEventListener("keydown", onKey);
-      gestures.forEach((g) => window.removeEventListener(g, unlockFromAnyGesture));
-      document.body.style.overflow = prevOverflow;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reduced]);
-
-  const unmute = async () => {
-    if (!audioRef.current) return;
-    const ok = await audioRef.current.unlock();
-    if (ok) setNeedsTap(false);
-  };
 
   return (
     <div className={`ldr-root${exiting ? " ldr-exit" : ""}`} role="status" aria-label="Loading Om Dagur">
@@ -188,16 +172,6 @@ export default function Loader({ onDone }) {
         }
         .ldr-btn:hover { color: #FFD700; border-color: rgba(255,215,0,.5); }
         .ldr-skip { right: 26px; }
-        /* Centred and filled - on a first visit the browser blocks audio until
-           something is clicked, so this needs to read as the obvious action,
-           not a corner afterthought. */
-        .ldr-sound {
-          left: 50%; bottom: 74px; transform: translateX(-50%);
-          color: #050505; background: #FFD700; border-color: #FFD700;
-          font-weight: 700; font-size: 12px; padding: 12px 26px;
-          animation: ldrPulse 1.3s ease-in-out infinite;
-        }
-        .ldr-sound:hover { color: #050505; background: #ffdf3d; border-color: #ffdf3d; }
 
         @keyframes ldrBeam {
           0%   { transform: rotate(-42deg) scaleY(.6); opacity: 0; }
@@ -305,11 +279,6 @@ export default function Loader({ onDone }) {
 
       <div className={`ldr-flash${blown ? " on" : ""}`} />
 
-      {needsTap && (
-        <button className="ldr-btn ldr-sound" onClick={unmute} aria-label="Turn sound on">
-          🔊 tap for sound
-        </button>
-      )}
       <button className="ldr-btn ldr-skip" onClick={finish}>skip</button>
     </div>
   );

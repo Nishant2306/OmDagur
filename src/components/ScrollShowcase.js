@@ -1,6 +1,105 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { T, useTheme, embedUrl, watchUrl } from "../theme";
-import { Thumb, PlayGlyph, usePrefersReducedMotion, useIsMobile, postToPlayer as post } from "../shared";
+import { Thumb, PlayGlyph, usePrefersReducedMotion, useIsMobile, postToPlayer as post, useYouTubeController, startListening } from "../shared";
+
+const fmtTime = (s) => {
+  if (!s || !isFinite(s)) return "0:00";
+  const total = Math.floor(s), h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60), sec = total % 60;
+  return h > 0
+    ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+    : `${m}:${String(sec).padStart(2, "0")}`;
+};
+
+/* Always-on transport controls for the active player.
+   YouTube's own bar hides itself and only returns on mouse movement inside
+   the iframe - which never happens here, because the video slides under a
+   stationary cursor rather than the cursor moving onto it. */
+function PlayerBar({ yt, t, mode, watchHref, isMob }) {
+  const pct = yt.duration ? Math.min(100, (yt.time / yt.duration) * 100) : 0;
+
+  const btn = (extra = {}) => ({
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    border: `1px solid ${t.border}`, background: "transparent",
+    color: t.textMuted, cursor: "pointer", borderRadius: 40,
+    transition: "all .2s ease", padding: 0, lineHeight: 1,
+    fontFamily: "'Space Mono', monospace", fontSize: 11,
+    ...extra,
+  });
+  const hoverOn = (e) => { e.currentTarget.style.color = t.accent; e.currentTarget.style.borderColor = `rgba(${t.accentRgb},.55)`; };
+  const hoverOff = (e) => { e.currentTarget.style.color = t.textMuted; e.currentTarget.style.borderColor = t.border; };
+
+  const seekFromClick = (e) => {
+    if (!yt.duration) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    yt.seekTo(((e.clientX - r.left) / r.width) * yt.duration);
+  };
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: isMob ? 8 : 12,
+      padding: isMob ? "8px 12px" : "9px 16px", borderRadius: 40,
+      background: mode === "dark" ? "rgba(12,12,12,.82)" : "rgba(255,255,255,.7)",
+      backdropFilter: "blur(14px)",
+      border: `1px solid ${t.border}`,
+      boxShadow: `0 10px 34px ${t.shadow}`,
+      pointerEvents: "auto",
+      width: "100%",
+    }}>
+      <button onClick={() => yt.nudge(-10)} aria-label="Back 10 seconds"
+        style={btn({ width: 32, height: 32, fontSize: 10 })}
+        onMouseEnter={hoverOn} onMouseLeave={hoverOff}>-10</button>
+
+      <button onClick={yt.toggle} aria-label={yt.playing ? "Pause" : "Play"}
+        style={btn({
+          width: 40, height: 40, background: t.accent, border: "none",
+          color: t.onAccent, fontSize: 15, flexShrink: 0,
+        })}>
+        {yt.playing
+          ? <span style={{ letterSpacing: 1, fontWeight: 700 }}>❚❚</span>
+          : <PlayGlyph size={13} color={mode === "dark" ? "#050505" : "#fff"} />}
+      </button>
+
+      <button onClick={() => yt.nudge(10)} aria-label="Forward 10 seconds"
+        style={btn({ width: 32, height: 32, fontSize: 10 })}
+        onMouseEnter={hoverOn} onMouseLeave={hoverOff}>+10</button>
+
+      {/* progress - click anywhere to seek */}
+      <div
+        onClick={seekFromClick}
+        role="slider" aria-label="Seek" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} tabIndex={0}
+        style={{ flex: 1, height: 16, display: "flex", alignItems: "center", cursor: "pointer", minWidth: 40 }}
+      >
+        <div style={{ position: "relative", width: "100%", height: 4, borderRadius: 3, background: t.border }}>
+          <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: t.accent, borderRadius: 3 }} />
+          <div style={{
+            position: "absolute", top: "50%", left: `${pct}%`,
+            transform: "translate(-50%,-50%)", width: 10, height: 10,
+            borderRadius: "50%", background: t.accent,
+          }} />
+        </div>
+      </div>
+
+      {!isMob && (
+        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: t.textFaint, whiteSpace: "nowrap" }}>
+          {fmtTime(yt.time)} / {fmtTime(yt.duration)}
+        </span>
+      )}
+
+      <button onClick={() => (yt.muted ? yt.unMute() : yt.mute())}
+        aria-label={yt.muted ? "Unmute" : "Mute"}
+        style={btn({
+          width: 32, height: 32, fontSize: 13,
+          color: yt.muted ? t.textMuted : t.accent,
+          borderColor: yt.muted ? t.border : `rgba(${t.accentRgb},.55)`,
+        })}>{yt.muted ? "🔇" : "🔊"}</button>
+
+      <a href={watchHref} target="_blank" rel="noopener noreferrer" aria-label="Watch on YouTube"
+        style={{ ...btn({ width: 32, height: 32, fontSize: 12, textDecoration: "none" }) }}
+        onMouseEnter={hoverOn} onMouseLeave={hoverOff}>↗</a>
+    </div>
+  );
+}
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -15,7 +114,7 @@ function PhoneShell({ t, active, children }) {
     <div style={{
       position: "relative",
       aspectRatio: "9 / 16",
-      height: "min(72vh, 660px)",
+      height: "min(64vh, 600px)",
       borderRadius: 44,
       background: t.deviceShell,
       border: `2px solid ${active ? `rgba(${t.accentRgb},0.55)` : t.deviceEdge}`,
@@ -39,7 +138,7 @@ function PhoneShell({ t, active, children }) {
 function LaptopShell({ t, active, children }) {
   return (
     // width is capped by viewport height too, so the lid never overflows the stage
-    <div style={{ width: "min(88vw, 1200px, 124vh)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+    <div style={{ width: "min(88vw, 1200px, 112vh)", display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div style={{
         position: "relative", width: "100%", aspectRatio: "16 / 10",
         borderRadius: "16px 16px 5px 5px",
@@ -72,7 +171,7 @@ function LaptopShell({ t, active, children }) {
 
 /* ── One item on the stage ───────────────────────────────── */
 
-function Stagepiece({ item, offset, isActive, isPlaying, soundOn, onPlayRef, t, mode }) {
+function Stagepiece({ item, offset, isActive, isPlaying, onPlayRef, onPlayerLoad, t, mode, yt, isMob }) {
   const a = Math.abs(offset);
   // Nothing beyond the immediate neighbours needs to exist.
   if (a > 1.25) return null;
@@ -100,6 +199,10 @@ function Stagepiece({ item, offset, isActive, isPlaying, soundOn, onPlayRef, t, 
         pointerEvents: isActive ? "auto" : "none",
       }}
     >
+      {/* Controls live INSIDE this transformed wrapper, so they travel and
+          scale with the device instead of sitting at a fixed spot on the
+          stage while the video slides away from them. */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
       <Shell t={t} active={isActive}>
         {isPlaying ? (
           <iframe
@@ -109,7 +212,13 @@ function Stagepiece({ item, offset, isActive, isPlaying, soundOn, onPlayRef, t, 
                muted. Sound is then turned on via postMessage, which also
                means toggling it never reloads the embed. */
             src={embedUrl(item, { autoplay: true, mute: true })}
-            onLoad={(e) => { if (soundOn) post(e.currentTarget, "unMute"); }}
+            onLoad={(e) => {
+              // Every fresh iframe needs its own handshake, or the controls
+              // sit frozen on the previous player's last reported time.
+              startListening(e.currentTarget);
+              post(e.currentTarget, "unMute");
+              onPlayerLoad();
+            }}
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
             allowFullScreen
@@ -130,6 +239,12 @@ function Stagepiece({ item, offset, isActive, isPlaying, soundOn, onPlayRef, t, 
           </>
         )}
       </Shell>
+        {isPlaying && yt && (
+          <div style={{ width: "min(100%, 560px)" }}>
+            <PlayerBar yt={yt} t={t} mode={mode} isMob={isMob} watchHref={watchUrl(item)} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -143,11 +258,11 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
   const isMob = useIsMobile();
   const sectionRef = useRef(null);
   const frameRefs = useRef({});
+  const activeFrameRef = useRef(null);
   const settleTimer = useRef(null);
 
   const [raw, setRaw] = useState(0);
   const [playing, setPlaying] = useState(-1);
-  const [soundOn, setSoundOn] = useState(true);
   // Whether the sticky stage is the thing you're actually looking at.
   const [onStage, setOnStage] = useState(false);
 
@@ -186,15 +301,22 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
   }, [N]);
 
   /* Only mount an iframe once the stack has settled on an item, so a fast
-     scroll doesn't spin up five embeds. Leaving the stage unmounts whatever
-     is playing, which is what stops audio following you down the page. */
+     scroll doesn't spin up five embeds. */
   useEffect(() => {
-    if (reduced) return;
+    if (reduced || !onStage) return;
     clearTimeout(settleTimer.current);
-    if (!onStage) { setPlaying(-1); return; }
     settleTimer.current = setTimeout(() => setPlaying(active), 260);
     return () => clearTimeout(settleTimer.current);
   }, [active, onStage, reduced]);
+
+  /* Scrolling past the section PAUSES rather than unmounts. Unmounting also
+     threw away your position, so coming back to a video you were halfway
+     through restarted it from zero. */
+  useEffect(() => {
+    const el = frameRefs.current[playing];
+    if (!el) return;
+    post(el, onStage ? "playVideo" : "pauseVideo");
+  }, [onStage, playing]);
 
   /* Belt and braces: pause the outgoing player the moment the active item
      changes, before React gets round to unmounting its iframe. */
@@ -204,14 +326,27 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
     });
   }, [playing]);
 
-  const toggleSound = useCallback(() => {
-    setSoundOn((s) => {
-      const next = !s;
-      const el = frameRefs.current[playing];
-      if (el) post(el, next ? "unMute" : "mute");
-      return next;
-    });
-  }, [playing]);
+  /* Bumped whenever an iframe (re)loads. Folded into the controller's key so
+     a remounted player resets the readout instead of inheriting stale values
+     from the element it replaced. */
+  const [playerNonce, setPlayerNonce] = useState(0);
+  const yt = useYouTubeController(activeFrameRef, playing >= 0 ? `${playing}:${playerNonce}` : null);
+
+  /* Sound on by default. A muted embed is the only kind browsers will
+     autoplay, so it starts muted and is unmuted immediately - which the
+     browser honours as soon as the visitor has interacted with the page
+     at all. This listener catches that first interaction wherever it
+     happens, so nobody has to hunt for a speaker button. */
+  useEffect(() => {
+    const unmuteNow = () => {
+      const el = activeFrameRef.current;
+      if (el) post(el, "unMute");
+    };
+    const G = ["pointerdown", "touchstart", "keydown"];
+    G.forEach((g) => window.addEventListener(g, unmuteNow, { passive: true }));
+    return () => G.forEach((g) => window.removeEventListener(g, unmuteNow));
+  }, []);
+
 
   const jumpTo = (i) => {
     const el = sectionRef.current;
@@ -269,8 +404,13 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
             offset={i - raw}
             isActive={i === active}
             isPlaying={playing === i}
-            soundOn={soundOn}
-            onPlayRef={(el) => { frameRefs.current[i] = el; }}
+            yt={playing === i ? yt : null}
+            isMob={isMob}
+            onPlayerLoad={() => setPlayerNonce((n) => n + 1)}
+            onPlayRef={(el) => {
+              frameRefs.current[i] = el;
+              if (playing === i) activeFrameRef.current = el;
+            }}
             t={t} mode={mode}
           />
         ))}
@@ -298,21 +438,14 @@ export default function ScrollShowcase({ items, galleryHref = "#/gallery" }) {
                 />
               ))}
             </div>
-            <button
-              onClick={toggleSound}
-              style={{
-                ...pill,
-                border: `1px solid ${soundOn ? `rgba(${t.accentRgb},.5)` : t.border}`,
-                background: soundOn ? `rgba(${t.accentRgb},.12)` : "transparent",
-                color: soundOn ? t.accent : t.textMuted,
-              }}
-            >{soundOn ? "🔊 Sound on" : "🔇 Sound off"}</button>
-            <a
-              href={watchUrl(current)} target="_blank" rel="noopener noreferrer"
-              style={{ ...pill, border: `1px solid ${t.border}`, color: t.textMuted }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = t.accent; e.currentTarget.style.borderColor = `rgba(${t.accentRgb},.5)`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = t.textMuted; e.currentTarget.style.borderColor = t.border; }}
-            >YouTube ↗</a>
+            {playing < 0 && (
+              <a
+                href={watchUrl(current)} target="_blank" rel="noopener noreferrer"
+                style={{ ...pill, border: `1px solid ${t.border}`, color: t.textMuted }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = t.accent; e.currentTarget.style.borderColor = `rgba(${t.accentRgb},.5)`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = t.textMuted; e.currentTarget.style.borderColor = t.border; }}
+              >YouTube ↗</a>
+            )}
           </div>
 
           <div style={{ position: "relative", height: 48, width: "100%", display: "flex", justifyContent: "center" }}>

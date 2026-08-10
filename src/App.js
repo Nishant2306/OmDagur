@@ -3,7 +3,8 @@ import { T, ThemeCtx, useTheme, MEDIA, CHANNELS, SOCIALS, TICKETS_URL } from "./
 import { Reveal, GlitchText, useIsMobile } from "./shared";
 import InteractiveBackground from "./components/InteractiveBackground";
 import Loader from "./components/Loader";
-import Marquee from "./components/Marquee";
+import EnterGate from "./components/EnterGate";
+import FlapBoard from "./components/FlapBoard";
 import ScrollShowcase from "./components/ScrollShowcase";
 import GalleryPage from "./components/GalleryPage";
 import BookShow from "./components/BookShow";
@@ -141,8 +142,13 @@ export default function OmDagurWebsite() {
   const [mode, setMode] = useState("dark");
   const [scrollY, setScrollY] = useState(0);
   const [route, setRoute] = useState(() => (isGalleryRoute() ? "gallery" : "home"));
-  // The loader is for the front door only, not the gallery tab.
-  const [showLoader, setShowLoader] = useState(() => !isGalleryRoute());
+  /* Entry sequence: "gate" (curtains) -> "loader" (mic check) -> "site".
+     The gate exists so the visitor's tap unlocks audio, which browsers
+     require before any sound can play. The gallery tab skips straight in. */
+  const [phase, setPhase] = useState(() => (isGalleryRoute() ? "site" : "gate"));
+  // Kept separate from `phase` so the curtains can finish sweeping after the
+  // loader has already started behind them.
+  const [showGate, setShowGate] = useState(() => !isGalleryRoute());
   const [loaded, setLoaded] = useState(() => isGalleryRoute());
   const [UnicornScene, setUnicornScene] = useState(null);
   const isMob = useIsMobile();
@@ -194,7 +200,8 @@ export default function OmDagurWebsite() {
 
   return (
     <ThemeCtx.Provider value={{ mode, toggle }}>
-      {showLoader && <Loader onDone={() => { setShowLoader(false); setLoaded(true); }} />}
+      {showGate && <EnterGate onEnter={() => setPhase("loader")} onFinished={() => setShowGate(false)} />}
+      {phase === "loader" && <Loader onDone={() => { setPhase("site"); setLoaded(true); }} />}
 
       <Chrome mode={mode}>
         {/* NAV */}
@@ -287,8 +294,8 @@ export default function OmDagurWebsite() {
           </div>
         </section>
 
-        {/* ═══ RIBBON ═══ */}
-        <Marquee />
+        {/* ═══ SPLIT-FLAP BOARD ═══ */}
+        <FlapBoard />
 
         {/* ═══ SCROLL SHOWCASE ═══ */}
         <ScrollShowcase items={MEDIA} galleryHref={GALLERY_HASH} />

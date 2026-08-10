@@ -97,15 +97,12 @@ export default function InteractiveBackground() {
         trailRef.current = trailRef.current.filter((p) => p.life > 0);
       }
 
-      /* ── halo around the pointer ── */
+      /* ── soft glow around the pointer ──
+         The orbiting arc segments that used to sit here read as permanent
+         ripples around the cursor. Ripples are now click-only, so only the
+         soft radial glow remains. */
       if (pointerLive && !isMob) {
         const cs = Math.min(mSpeed, 25);
-        for (let i = 0; i < 6; i++) {
-          const angle = (i / 6) * Math.PI * 2 + frame * 0.008;
-          const iR = 30 + Math.sin(frame * 0.02 + i) * 10, oR = 80 + cs * 1.5;
-          ctx.beginPath(); ctx.arc(mx, my, iR + (oR - iR) * 0.5, angle - 0.3, angle + 0.3);
-          ctx.strokeStyle = `${t.glow1}${Math.min(0.15, 0.06 + cs * 0.003)})`; ctx.lineWidth = 1.5; ctx.stroke();
-        }
         const gR = 120 + cs * 2;
         const grd = ctx.createRadialGradient(mx, my, 0, mx, my, gR);
         grd.addColorStop(0, `${t.glow1}0.07)`); grd.addColorStop(0.3, `${t.glow2}0.02)`); grd.addColorStop(1, `${t.glow1}0)`);
@@ -164,7 +161,7 @@ export default function InteractiveBackground() {
           p.vx += (-dy / dist) * f * 0.5; p.vy += (dx / dist) * f * 0.5;
           if (dist < 80) { p.orbitAngle += 0.03; p.vx += (mx + Math.cos(p.orbitAngle) * dist - p.x) * 0.02; p.vy += (my + Math.sin(p.orbitAngle) * dist - p.y) * 0.02; }
         }
-        if (attracted && dist < 100 && mSpeed > 8 && Math.random() < 0.02) addRipple(p.x, p.y, 80);
+        // (ripples used to spawn here from fast pointer movement - now click-only)
         p.vx *= 0.985; p.vy *= 0.985;
         const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
         if (speed > 3) { p.vx = (p.vx / speed) * 3; p.vy = (p.vy / speed) * 3; }
@@ -250,10 +247,15 @@ export default function InteractiveBackground() {
         mouseRef.current = { x: tc.clientX, y: tc.clientY, speed: Math.sqrt((tc.clientX - prev.x) ** 2 + (tc.clientY - prev.y) ** 2) };
       }
     };
+    // Touch gets the same ripple a click does - it's the touch equivalent.
+    const handleTouchStart = (e) => {
+      if (e.touches.length > 0) addRipple(e.touches[0].clientX, e.touches[0].clientY, 250);
+    };
 
     window.addEventListener("mousemove", handleMouse, { passive: true });
     window.addEventListener("click", handleClick);
     window.addEventListener("touchmove", handleTouch, { passive: true });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
     document.addEventListener("mouseleave", handleLeave);
 
     return () => {
@@ -262,6 +264,7 @@ export default function InteractiveBackground() {
       window.removeEventListener("mousemove", handleMouse);
       window.removeEventListener("click", handleClick);
       window.removeEventListener("touchmove", handleTouch);
+      window.removeEventListener("touchstart", handleTouchStart);
       document.removeEventListener("mouseleave", handleLeave);
     };
   }, [mode, reduced, t.glow1, t.glow2, t.particle1, t.particle2]);

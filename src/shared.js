@@ -1,15 +1,114 @@
 import { useState, useEffect, useRef } from "react";
 import { T, useTheme, thumbCandidates } from "./theme";
 
-/* Command a YouTube iframe (mute/unMute/pauseVideo/playVideo) without
+/* Command a YouTube iframe (mute/unMute/pauseVideo/playVideo/seekTo) without
    touching its src, so the embed never reloads. Requires enablejsapi=1. */
-export const postToPlayer = (el, func) => {
+export const postToPlayer = (el, func, args = []) => {
   try {
-    el?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
+    el?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*");
   } catch { /* iframe not ready yet */ }
 };
 
+/* Ask a player to start reporting its state back to us. Must be re-sent for
+   every new iframe element, not just once per mount of the controller. */
+export const startListening = (el) => {
+  try {
+    el?.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*");
+  } catch { /* not ready */ }
+};
+
+/**
+ * Live state for one YouTube embed, plus commands to drive it.
+ *
+ * Why this exists: YouTube hides its own control bar after a few seconds and
+ * only brings it back on mouse movement INSIDE the iframe. In the scroll
+ * showcase the video slides into place under a stationary cursor - the
+ * element moves, the pointer doesn't - so no mousemove ever reaches the
+ * player and its controls stay hidden. Driving our own bar from the IFrame
+ * API means the controls are always there regardless.
+ */
+export function useYouTubeController(frameRef, playerKey) {
+  const [state, setState] = useState({ ready: false, playing: false, muted: true, time: 0, duration: 0 });
+
+  useEffect(() => {
+    /* Keyed on WHICH player, not merely on whether one exists. Keying on
+       existence meant moving from video 1 to video 2 never reset anything,
+       so the scrubber and timestamp kept showing the previous video's
+       position until the new one happened to report in. */
+    setState({ ready: false, playing: false, muted: true, time: 0, duration: 0 });
+    if (playerKey === null || playerKey === undefined) return;
+
+    const onMsg = (e) => {
+      if (typeof e.origin !== "string" || e.origin.indexOf("youtube.com") === -1) return;
+      // Several players can be alive at once - only accept our own.
+      if (!frameRef.current || e.source !== frameRef.current.contentWindow) return;
+      let d = e.data;
+      try { d = typeof d === "string" ? JSON.parse(d) : d; } catch { return; }
+      if (!d) return;
+      if (d.event === "onReady" || d.event === "initialDelivery") setState((s) => ({ ...s, ready: true }));
+      const info = d.info;
+      if (info) {
+        setState((s) => ({
+          ...s,
+          ready: true,
+          playing: info.playerState === 1 ? true : (info.playerState === 2 || info.playerState === 0 ? false : s.playing),
+          time: typeof info.currentTime === "number" ? info.currentTime : s.time,
+          duration: info.duration || s.duration,
+          muted: typeof info.muted === "boolean" ? info.muted : s.muted,
+        }));
+      }
+    };
+
+    window.addEventListener("message", onMsg);
+    // The player may already be up by the time we mount, so keep nudging
+    // briefly until it answers rather than relying on a single handshake.
+    let tries = 0;
+    const iv = setInterval(() => {
+      if (frameRef.current) startListening(frameRef.current);
+      if (++tries > 12) clearInterval(iv);
+    }, 400);
+    startListening(frameRef.current);
+
+    return () => { window.removeEventListener("message", onMsg); clearInterval(iv); };
+  }, [frameRef, playerKey]);
+
+  const cmd = (func, args) => postToPlayer(frameRef.current, func, args);
+  return {
+    ...state,
+    play: () => cmd("playVideo"),
+    pause: () => cmd("pauseVideo"),
+    toggle: () => cmd(state.playing ? "pauseVideo" : "playVideo"),
+    mute: () => cmd("mute"),
+    unMute: () => cmd("unMute"),
+    seekTo: (s) => cmd("seekTo", [Math.max(0, s), true]),
+    nudge: (delta) => cmd("seekTo", [Math.max(0, state.time + delta), true]),
+  };
+}
+
 /* Respects the OS "reduce motion" setting - we tone down the heavy stuff for it. */
+/* Body scroll lock, reference-counted.
+   Two overlapping overlays (the entry curtains, and the loader behind them)
+   each used to save and restore document.body.style.overflow themselves. The
+   second captured "hidden" - already set by the first - as its "previous"
+   value, so on unmount it restored the page to hidden and left the site
+   permanently unscrollable. Counting locks preserves the true original. */
+let scrollLocks = 0;
+let overflowBeforeLock = "";
+export function useBodyScrollLock(active = true) {
+  useEffect(() => {
+    if (!active) return undefined;
+    if (scrollLocks === 0) {
+      overflowBeforeLock = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    scrollLocks += 1;
+    return () => {
+      scrollLocks = Math.max(0, scrollLocks - 1);
+      if (scrollLocks === 0) document.body.style.overflow = overflowBeforeLock;
+    };
+  }, [active]);
+}
+
 export function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
